@@ -10,7 +10,7 @@ class DissonanceAnalysis ():
         self.pitchCollectionSequenceList = pitchCollectionSequences
         #self.featuresPath = 'dissonanceNeuralNetwork/observations.npy' 
         #self.labelsPath = 'dissonanceNeuralNetwork/labels.npy'
-        self.modelPath = 'dissonanceNeuralNetwork/model.h5'
+        self.modelPath = 'models/dissonanceModel.h5'
         
         ''' run model '''
         #self.features = np.load(self.featuresPath)

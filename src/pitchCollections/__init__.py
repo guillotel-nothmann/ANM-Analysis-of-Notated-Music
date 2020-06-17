@@ -19,6 +19,7 @@ from python_log_indenter import IndentedLoggerAdapter
 from music21.chord import Chord
 from music21.tree.timespanTree import TimespanTree
 from music21.languageExcerpts.instrumentLookup import transposition
+from email.charset import SHORTEST
  
 
 class PitchCollectionSequences(object):
@@ -217,6 +218,11 @@ class PitchCollectionSequences(object):
         ''' loads xmlData into pitch coll sequence '''
         
         self.pitchCollectionSequenceList[0].loadXMLAnalysis(xmlString)
+        
+        
+    def setRootsFromStream(self, rootStream):
+        for pitchCollSequence in self.pitchCollectionSequenceList:
+            pitchCollSequence.setRootsFromStream(rootStream)
          
     
 class PitchCollectionSequence (object):
@@ -374,32 +380,32 @@ class PitchCollectionSequence (object):
         
         return None
     
-    def getChordifiedStream (self, unused_filter=['CN', 'SU']):
-    
-        ''' build root stream and chordify it '''
-        rootStream = self.getFundamentalBass()
-        chordifiedStream = rootStream.chordify()
-        
-        ''' loop over chords in stream '''
-        for chordElement in chordifiedStream.flat.getElementsByClass(chord.Chord):
-            offset = chordElement.offset
-            duration = chordElement.duration.quarterLength
-            if len (chordElement.pitches) > 0:
-                chordElement.root = chordElement.pitches[0]
-            else: chordElement.root = None
-            
-            ''' get all pitches between offset and next offset '''
-            analyzedPitchList = self.getExplainedPitchesFromTo(offset, offset + duration, None)
-            
-            subList = []
-            for analyzedPitch in analyzedPitchList:
-                
-                ''' filter pitches and add them '''
-                if analyzedPitch.pitchType in unused_filter: 
-                    subList.append(analyzedPitch.pitch)
-            chordElement.pitches = subList
-        
-        return chordifiedStream            
+#     def getChordifiedStream (self, unused_filter=['CN', 'SU']):
+#     
+#         ''' build root stream and chordify it '''
+#         rootStream = self.getFundamentalBass()
+#         chordifiedStream = rootStream.chordify()
+#         
+#         ''' loop over chords in stream '''
+#         for chordElement in chordifiedStream.flat.getElementsByClass(chord.Chord):
+#             offset = chordElement.offset
+#             duration = chordElement.duration.quarterLength
+#             if len (chordElement.pitches) > 0:
+#                 chordElement.root = chordElement.pitches[0]
+#             else: chordElement.root = None
+#             
+#             ''' get all pitches between offset and next offset '''
+#             analyzedPitchList = self.getExplainedPitchesFromTo(offset, offset + duration, None)
+#             
+#             subList = []
+#             for analyzedPitch in analyzedPitchList:
+#                 
+#                 ''' filter pitches and add them '''
+#                 if analyzedPitch.pitchType in unused_filter: 
+#                     subList.append(analyzedPitch.pitch)
+#             chordElement.pitches = subList
+#         
+#         return chordifiedStream            
     
     def getPitchCollectionSubset (self, startOffset, endOffset):
         subList = []
@@ -449,7 +455,7 @@ class PitchCollectionSequence (object):
         
         return pitchList   
     
-    def getObservations(self):
+    def getPitchObservations(self):
         import numpy as np
         import os
         
@@ -501,78 +507,65 @@ class PitchCollectionSequence (object):
                 
                 fileIndex = fileIndex + 1
     
-    def getObservationsForPitchId(self, analyzedPitchId, context=5, offset=0):
+    
+    
+    def setVerticalityObservations (self, observationsDirectory):
+        import numpy as np
+        import os
         
-        ''' build list of list and fill everything with 0'''
-        pitchList = []
-        contextList = []
+        ''' get highest fileIndex in folder '''
+ 
+        filenameList = []
         
-        observationList = [0, 0, 0, 0, 0, 0, 0, 0]
+        for filename in os.listdir(observationsDirectory + "/observations"):
+            if filename[-3:] != 'npy':continue
+            filenameList.append(filename)
+
+        fileIndex = len(filenameList)
         
-        for unused_counter in range (0, 7):
-            pitchList.append(deepcopy(observationList))     
-        
-        for unused_counter in range (0, context * 2 + 1):
-            contextList.append(deepcopy(pitchList)) 
-        
-        ''' get transposition interval '''
-        observedPitch = self.getAnalyzedPitchCorrespondingToId(analyzedPitchId, offset)
-        transpositionInterval = interval.Interval(noteStart=observedPitch[0].pitch, noteEnd=pitch.Pitch('C4'))  # # reference is arbitrarily set to 'C4' could be any pitch 
-        
-        # print ('Reference pitch: ' + observedPitch[0].pitch.step + ", diatonic number: " + str(pitchDiatonicNumber) + ", diatonic vector: " + str (diatonicVector))
-        
-        ''' create pitchCollList i.e. context before and after reference offset'''
-        pitchCollectionList = self.getPitchCollectionContext(offset, context)
-        
-        ''' loop over pitch colls '''
-        for index in range (0, len(pitchCollectionList)):
-            pitchCollection = pitchCollectionList[index]
+        ''' loop over all pitch collections '''
+        for pitchCollection in self.explainedPitchCollectionList: 
+                
+            ''' get observation list '''
+            observationList = self.getObservationsForVerticality(pitchCollection.verticality, 5)
             
-            if pitchCollection == None: continue  # in that case all values remain zero
-            deepestPitchClass = pitchCollection.getBassPitch().step  # get deepest pitch class
+             
+            # fileObservations.write(observationString)
+    
+            ''' store label in file_2'''
+            rootPitch = pitchCollection.rootPitch
+            if not isinstance(rootPitch, pitch.Pitch):
+                print ("Wrong label...skip: " + str(rootPitch))
+                continue
+            else:
+                rootPitchName = rootPitch.name
+            # fileLabel.write(labelString)
+    
+            #''' store id in file_3 ''' 
+            #if pitchCollection.id == None or pitchCollection.verticality.offset == None:
+            #    print ("ID or Offset not identified... skip")
+            #    continue 
+            #idString = pitchCollection.id + '; ' + str(pitchCollection.verticality.offset)
+            # fileId.write(idString)
             
-            ''' loop over every analyzed pitch '''
-            for analyzedPitch in pitchCollection.analyzedPitchList:
-                
-                ''' transpose pitch '''
-                transpositionInterval.noteStart = note.Note(analyzedPitch.pitch.nameWithOctave)
-                transposedPitch = transpositionInterval.noteEnd.pitch
-                
-                ''' get diatonic step'''
-                diatonicStep = (transposedPitch.diatonicNoteNum - 1) % 7
-                
-                # print ("Observed pitch (0): %s, transposition interval: %s, current pitch: %s, transposition: %s, diatonic step: %s, alteration: %s " %(observedPitch[0].pitch, transpositionInterval, analyzedPitch.pitch.nameWithOctave, transposedPitch.nameWithOctave, diatonicStep, transposedPitch.alter))
-                
-                ''' fill list with dimension at corresponding position '''
-                    
-                ''' 1. vectorized diatonic steps '''
-                contextList[index][diatonicStep][0] = 1 
-                
-                ''' 2. alteration '''
-                contextList[index][diatonicStep][1] = transposedPitch.alter
-                
-                ''' 3. deepest pitch class '''   
-                contextList[index][diatonicStep][2] = 1 if deepestPitchClass == analyzedPitch.pitch.step else 0
-                
-                ''' 4. duration '''
-                contextList[index][diatonicStep][3] = pitchCollection.duration
-                
-                ''' 5. beat strength '''
-                contextList[index][diatonicStep][4] = pitchCollection.verticality.beatStrength 
-                
-                ''' 6. attack '''
-                contextList[index][diatonicStep][5] = 1 if analyzedPitch.attack == True else 0
-                
-                ''' 7. occurrence '''
-                contextList[index][diatonicStep][6] = contextList[index][diatonicStep][6] + 1 
-                
-                ''' 8. same voice - part as reference pitch ''' 
-                if contextList[index][diatonicStep][7] == 0:  # the diatonic step may be instantiated by another pitch. If result is positive, leave it like this
-                    if analyzedPitch.part == observedPitch[0].part and analyzedPitch.voice == observedPitch[0].voice:
-                        contextList[index][diatonicStep][7] = 1 
-                    else: 0 
+            ''' put everything in numpy array'''
+            thisdict = {"C-":0, "C":1, "C#":2,"C##":2, "D-":3, "D":4, "D#":5, "E--":6, "E-":6, "E":7, "E#":8, "F-":9, "F":10, "F#":11, "F##":11, "G-":12, "G":13, "G#":14, "A-":15, "A":16, "A#":17, "B--": 18, "B-":18, "B":19, "B#":20}
+            idString = str(pitchCollection.rootPitch) + '; ' + str(pitchCollection.verticality.offset)
+        
             
-        return contextList 
+            np.save(observationsDirectory + "/observations/" + str(fileIndex).zfill(9), np.array(observationList), True, False)
+            np.save(observationsDirectory + "/labels/" + str(fileIndex).zfill(9), np.array(thisdict[rootPitchName]), True, False)
+            np.save(observationsDirectory + "/ids/" + str(fileIndex).zfill(9), np.array(idString), True, False)
+            
+            #print ("Observation %s set" % (fileIndex))
+            
+            # fileObservations.close()
+            # fileLabel.close()
+            # fileId.close()
+            
+            fileIndex = fileIndex + 1
+    
+    
     
     def loadXMLAnalysis (self, xmlString):
         
@@ -672,7 +665,150 @@ class PitchCollectionSequence (object):
                 ''' get sublist of analyzed pitches which share the same id (i.e. which are part of the same note / chord )'''
                 subList = self.getAnalyzedPitches(analyzedPitch.id)        
                 self.idDictionary.update({analyzedPitch.id: subList})
+    def getObservationsForVerticality(self, verticality, context = 5):
+        ''' build list of list and fill everything with 0'''
+        offset = verticality.offset
+        verticalityList = []
+        contextList = []
+        
+        note2NumDic =  {"C-":0, "C":1, "C#":2, "C##":2, "D-":3, "D":4, "D#":5, "E--":6,  "E-":6, "E":7, "E#":8, "F-":9, "F":10, "F#":11, "F##":11, "G-":12, "G":13, "G#":14, "A-":15, "A":16, "A#":17, "B--": 18,  "B-":18, "B":19, "B#":20}
+        
+        
+        observationList = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        
+        for unused_counter in range (0, 21):
+            verticalityList.append(deepcopy(observationList))     
+        
+        for unused_counter in range (0, context * 2 + 1):
+            contextList.append(deepcopy(verticalityList)) 
             
+        ''' create pitchCollList i.e. context before and after reference offset'''
+        pitchCollectionList = self.getPitchCollectionContext(offset, context)
+        
+        ''' loop over pitch colls '''
+        for index in range (0, len(pitchCollectionList)):
+            pitchCollection = pitchCollectionList[index]
+            
+            if pitchCollection == None: continue  # in that case all values remain zero 
+            deepestPitchClass = pitchCollection.getBassPitch().step  # get deepest pitch class
+            
+            ''' loop over every analyzed pitch '''
+            for analyzedPitch in pitchCollection.analyzedPitchList:
+                ''' get diatonic step'''
+                chromaticStep =note2NumDic[analyzedPitch.pitch.name]
+                
+                # print ("Observed pitch (0): %s, transposition interval: %s, current pitch: %s, transposition: %s, diatonic step: %s, alteration: %s " %(observedPitch[0].pitch, transpositionInterval, analyzedPitch.pitch.nameWithOctave, transposedPitch.nameWithOctave, diatonicStep, transposedPitch.alter))
+                
+                
+                ''' fill list with dimension at corresponding position '''
+                    
+                ''' 1. chromatic pitch class '''
+                contextList[index][chromaticStep][0] = 1  
+                
+                ''' 2. deepest pitch class '''   
+                if deepestPitchClass == analyzedPitch.pitch.name: 
+                    contextList[index][chromaticStep][1] = 1 
+                
+                
+                
+                ''' 3. duration '''
+                contextList[index][chromaticStep][2] = pitchCollection.duration
+                
+                ''' 4. beat strength '''
+                contextList[index][chromaticStep][3] = pitchCollection.verticality.beatStrength 
+                
+                ''' 5. attack '''
+                contextList[index][chromaticStep][4] = 1 if analyzedPitch.attack == True else 0
+                
+                ''' 6. occurrence '''
+                contextList[index][chromaticStep][5] = contextList[index][chromaticStep][5] + 1 
+                
+                ''' 7. dissonancePattern ''' 
+                if analyzedPitch.pitchType == "CN" : contextList[index][chromaticStep][6] =1
+                
+                '''8 octave location (octaves 0 to 10) '''
+                contextList[index][chromaticStep][7 + analyzedPitch.pitch.octave] = contextList[index][chromaticStep][7 + analyzedPitch.pitch.octave] + 1
+                
+        
+        
+       
+        
+        return contextList 
+    
+    def getObservationsForPitchId(self, analyzedPitchId, context=5, offset=0):
+        
+        ''' build list of list and fill everything with 0'''
+        pitchList = []
+        contextList = []
+        
+        observationList = [0, 0, 0, 0, 0, 0, 0, 0]
+        
+        for unused_counter in range (0, 7):
+            pitchList.append(deepcopy(observationList))     
+        
+        for unused_counter in range (0, context * 2 + 1):
+            contextList.append(deepcopy(pitchList)) 
+        
+        ''' get transposition interval '''
+        observedPitch = self.getAnalyzedPitchCorrespondingToId(analyzedPitchId, offset)
+        transpositionInterval = interval.Interval(noteStart=observedPitch[0].pitch, noteEnd=pitch.Pitch('C4'))  # # reference is arbitrarily set to 'C4' could be any pitch 
+        
+        # print ('Reference pitch: ' + observedPitch[0].pitch.step + ", diatonic number: " + str(pitchDiatonicNumber) + ", diatonic vector: " + str (diatonicVector))
+        
+        ''' create pitchCollList i.e. context before and after reference offset'''
+        pitchCollectionList = self.getPitchCollectionContext(offset, context)
+        
+        ''' loop over pitch colls '''
+        for index in range (0, len(pitchCollectionList)):
+            pitchCollection = pitchCollectionList[index]
+            
+            if pitchCollection == None: continue  # in that case all values remain zero
+            deepestPitchClass = pitchCollection.getBassPitch().step  # get deepest pitch class
+            
+            ''' loop over every analyzed pitch '''
+            for analyzedPitch in pitchCollection.analyzedPitchList:
+                
+                ''' transpose pitch '''
+                transpositionInterval.noteStart = note.Note(analyzedPitch.pitch.nameWithOctave)
+                transposedPitch = transpositionInterval.noteEnd.pitch
+                
+                ''' get diatonic step'''
+                diatonicStep = (transposedPitch.diatonicNoteNum - 1) % 7
+                
+                # print ("Observed pitch (0): %s, transposition interval: %s, current pitch: %s, transposition: %s, diatonic step: %s, alteration: %s " %(observedPitch[0].pitch, transpositionInterval, analyzedPitch.pitch.nameWithOctave, transposedPitch.nameWithOctave, diatonicStep, transposedPitch.alter))
+                
+                ''' fill list with dimension at corresponding position '''
+                    
+                ''' 1. vectorized diatonic steps '''
+                contextList[index][diatonicStep][0] = 1 
+                
+                ''' 2. alteration '''
+                contextList[index][diatonicStep][1] = transposedPitch.alter
+                
+                ''' 3. deepest pitch  '''   
+                contextList[index][diatonicStep][2] = 1 if deepestPitchClass == analyzedPitch.pitch.step else 0
+                
+                ''' 4. duration '''
+                contextList[index][diatonicStep][3] = pitchCollection.duration
+                
+                ''' 5. beat strength '''
+                contextList[index][diatonicStep][4] = pitchCollection.verticality.beatStrength 
+                
+                ''' 6. attack '''
+                contextList[index][diatonicStep][5] = 1 if analyzedPitch.attack == True else 0
+                
+                ''' 7. occurrence '''
+                contextList[index][diatonicStep][6] = contextList[index][diatonicStep][6] + 1 
+                
+                ''' 8. same voice - part as reference pitch ''' 
+                if contextList[index][diatonicStep][7] == 0:  # the diatonic step may be instantiated by another pitch. If result is positive, leave it like this
+                    if analyzedPitch.part == observedPitch[0].part and analyzedPitch.voice == observedPitch[0].voice:
+                        contextList[index][diatonicStep][7] = 1 
+                    else: 0 
+            
+        return contextList         
+    
+    
     def getXMLRepresentation(self):
         ''' creates an xml representation of analytical information of pitch colls and analysed pitches ''' 
         
@@ -693,6 +829,18 @@ class PitchCollectionSequence (object):
         xmlSequence = xmlSequence + "</root>"
             
         return xmlSequence    
+    
+    def setRootsFromStream(self, stream):
+        
+        flatRootSream = stream.flat
+        
+        for pitchColl in self.explainedPitchCollectionList:    
+            rootNote = flatRootSream.getElementAtOrBefore(pitchColl.verticality.offset, note.Note)
+            if rootNote ==None: continue
+            pitchColl.rootPitch = rootNote.pitch
+                
+            
+            
     
     def showStatistics (self, timeElapsed):
         ''' get analyzed pitches '''
@@ -1137,17 +1285,24 @@ class PitchCollection():
     def __init__(self, verticality, analyzedPitchList, chordTemplates=None):
         self.analyzedPitchList = analyzedPitchList
         self.verticality = verticality
+         
         
         ''' harmonic information '''
         self.chord = verticality.toChord() 
         self.chordHypothesisList = []
-        self.probability = 0
+        self.probability = 0 ### should be changed
         self.template = None
         self.rootPitch = None 
         self.rep2PitchDictionary = None
                
-        if verticality != None and verticality.nextVerticality != None:
-            self.duration = verticality.nextVerticality.offset - verticality.offset
+        if verticality != None:
+            shortestEndTime = verticality.startAndOverlapTimespans[0].endTime
+            for element in verticality.startAndOverlapTimespans:
+                if element.endTime < shortestEndTime: shortestEndTime = element.endTime
+            self.duration = shortestEndTime - verticality.offset
+            
+            
+            
         else: self.duration = 0
     
     def addAnalyzedPitch (self, analyzedPitch):
@@ -1321,6 +1476,8 @@ class PitchCollection():
                 return False  
             
         return True
+    
+  
     
     def verticalityWithDissonanceSubstitutionsIsConsonant (self):
         ''' build chord object which contains substitutions for dissonant notes '''

@@ -3,6 +3,7 @@ Created on Dec 14, 2019
 
 @author: christophe
 '''
+import rootAnalysis
 
 if __name__ == '__main__':
     pass
@@ -17,16 +18,19 @@ if __name__ == '__main__': pass
 logging.basicConfig(level=logging.INFO)
 
 ''' get file '''
-work = converter.parse('examples/1_Bransle_double.mei')
+work = converter.parse('examples/787.mei')
  
 ''' create PirtchCollectionSequencesObject '''
 pitchCollectionSequences = pitchCollections.PitchCollectionSequences(work) 
 
-''' dissonance analysis '''
-dissonanceAnal = dissonanceAnalysis.DissonanceAnalysis(pitchCollectionSequences)
+rootAnal = rootAnalysis.RootAnalysis(pitchCollectionSequences)
+observationData = rootAnal.getObservationData()
+
+#''' dissonance analysis '''
+#dissonanceAnal = dissonanceAnalysis.DissonanceAnalysis(pitchCollectionSequences)
  
 ''' get analysis and print it in file '''
-file = open('examples/1_Bransle_double.xml', "w")
-xmlString = pitchCollectionSequences.getXMLRepresentation()
-file.write(xmlString)
-file.close
+#file = open('examples/787.xml', "w")
+#xmlString = pitchCollectionSequences.getXMLRepresentation() 
+#file.write(xmlString)
+#file.close
