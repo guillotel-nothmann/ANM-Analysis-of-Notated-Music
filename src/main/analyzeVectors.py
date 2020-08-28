@@ -34,11 +34,9 @@ workBookPath = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/rootsAndVectors.
 
 
 corrputedFilesList = []
-
 analyzedWorksList = []
 
-workVectorDictionary = {}
-workRootDictionary = {}
+rootList = [] 
 
 
 for file in os.listdir(workWithRootDirectoryString):
@@ -101,6 +99,21 @@ wb.save(workBookPath)
 dataDictionary= {
     'File name': [],
     }
+
+ 
+
+
+for workDataCounter, workData in enumerate (analyzedWorksList): 
+    rootDict = workData [1] 
+    
+    for rootElement in rootDict:
+        if not rootElement in rootList:
+            rootList.append(rootElement)
+            
+rootList.sort()
+
+
+
 for workDataCounter, workData in enumerate (analyzedWorksList):
     fileName = workData [0]
     rootDict = workData [1]
@@ -118,23 +131,26 @@ for workDataCounter, workData in enumerate (analyzedWorksList):
         if vector in vectorDict:
             dataList.append (vectorDict[vector]["occurrence"]) 
             
+        else:
+            dataList.append("")
+            
          
-    for rootKey, rootEntry in rootDict.items():
-        
-        
+    for rootElement in rootList: 
         for interv in ["P1", "m3", "M3", "p5", "d5"]:
-            dataList = getListFromDictionary(dataDictionary, rootKey + "_" + interv)
-            if interv in rootEntry : 
-                dataList.append (rootEntry[interv])
+            dataList = getListFromDictionary(dataDictionary, rootElement + "_" + interv)
+            
+            if rootElement in rootDict:
+                rootEntry = rootDict[rootElement]
+            
+                if interv in rootEntry : 
+                    dataList.append (rootEntry[interv])
+                else:
+                    dataList.append("")
+            else:
+                dataList.append("")
              
          
-    ''' loop over every key of dataDictionary, if field is missing, add blank '''
-    
-    for dataKey, dataLine in dataDictionary.items():
-        if len (dataLine)!= workDataCounter + 1: 
-            
-            print (dataKey + str(len(dataLine)) + " " + str(workDataCounter + 1))   
-            dataLine.append("")           
+           
 
 
 json = json.dumps(dataDictionary)

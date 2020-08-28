@@ -24,17 +24,17 @@ rootDirectoryName = directoryName(directoryName(directoryName(__file__)))
 #rootDirectoryString = '/Users/christophe/Documents/GitHub/PraetoriusTerpsichore/xmlWithRoot/'
 #observationPath = rootDirectoryName + "/observations/rootObservationData"
 
-minAnalysis = 2
+minAnalysis = 1
 
-workDirectoryStringComparison = '/Users/christophe/Dropbox/HarmonisationsBach/analyseComparaisons/'
-workDirectoryStringModel = '/Users/christophe/Dropbox/HarmonisationsBach/analyseModèle/'
-workDirectoryStringCraig = '/Users/christophe/Dropbox/HarmonisationsBach/Craig/'
-workDirectoryStringMarc = '/Users/christophe/Dropbox/HarmonisationsBach/Marc/'
-workDirectoryStringChristophe = '/Users/christophe/Dropbox/HarmonisationsBach/Christophe/'
-workDirectoryStringNicolas = '/Users/christophe/Dropbox/HarmonisationsBach/Nicolas/'
-workDirectoryStringAnneEmmanuelle = '/Users/christophe/Dropbox/HarmonisationsBach/Anne-Emmanuelle/'
+workDirectoryStringComparison = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/comparisons/'
+workDirectoryStringModel = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/Modèle/'
+#workDirectoryStringCraig = '/Users/christophe/Dropbox/HarmonisationsBach/Craig/'
+#workDirectoryStringMarc = '/Users/christophe/Dropbox/HarmonisationsBach/Marc/'
+workDirectoryStringChristophe = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/Christophe/'
+#workDirectoryStringNicolas = '/Users/christophe/Dropbox/HarmonisationsBach/Nicolas/'
+workDirectoryStringAnneEmmanuelle = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/Anne-Emmanuelle/'
 
-workDirectoryNameList = [[workDirectoryStringMarc, "Marc"], [workDirectoryStringChristophe, "Christophe"], [workDirectoryStringNicolas, "Nicolas"], [workDirectoryStringAnneEmmanuelle, "Anne-Emmanuelle"], [workDirectoryStringCraig, "Craig"]]
+workDirectoryNameList = [[workDirectoryStringChristophe, "Christophe"], [workDirectoryStringAnneEmmanuelle, "Anne-Emmanuelle"]]
 
 
 corrputedFilesList = []
@@ -43,6 +43,8 @@ for file in os.listdir(workDirectoryStringModel):
     fileName = os.fsdecode(file)
     if fileName.endswith(".musicxml")== False: continue
     streamList = []
+    
+    print (fileName)
     
     for workDirectoryString in workDirectoryNameList:
     
@@ -56,6 +58,8 @@ for file in os.listdir(workDirectoryStringModel):
 
     
     if len (streamList) <= minAnalysis: continue
+    
+    print ("Comparing files " + fileName)
     
     ''' create reference analysis withouth root stream '''
     workStream = converter.parse(workDirectoryStringModel + fileName)
