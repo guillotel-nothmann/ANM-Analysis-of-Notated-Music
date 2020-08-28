@@ -5,7 +5,7 @@
 # Copyright:    Christophe Guillotel-Nothmann Copyright © 2017
 #-------------------------------------------------------------------------------
 
-from music21 import tree, note, chord, stream, pitch, interval
+from music21 import tree, note, chord, stream, pitch, interval, expressions
 from music21.tree.spans import PitchedTimespan
 from music21.tree.verticality import VerticalitySequence, Verticality
 from _operator import and_
@@ -28,30 +28,141 @@ class PitchCollectionSequences(object):
         ''' create stream and AVL tree, get chord Templates '''
         
         self.stream = work
+        self.semiFlatStream = self.stream.semiFlat
         # self.scoreTree=self.stream.asTimespans(classList=(note.Note, chord.Chord))
         self.scoreTree = tree.fromStream.asTimespans(self.stream, flatten=True, classList=(note.Note, chord.Chord))
         
         self.pitchCollectionSequenceList = []
         self.adaptableFrame = adaptableFrame
         self.exploreHypothesis = exploreHypothesis
+        self.endTimeList = []
         
-        ''' 1.Create AnalyzedPitchCollectionSequence  '''
+        
+        ''' Create AnalyzedPitchCollectionSequence  '''
         explainedPitchCollectionList = []
         logging.info ('Creating pitch collections...') 
         for verticality in self.scoreTree.iterateVerticalities():
+            
+            ''' check if next event is not general break  '''
+            generalRestPitchColl = self.getGeneralRestNextEvent(verticality)
+            
+
+            
+            
+            
             ''' create pitch collection '''
             pitchCollection = self.createPitchCollection (verticality)
             explainedPitchCollectionList.append(pitchCollection)
+            
+            ''' adjust offset and duration if general rest exists '''
+            if generalRestPitchColl != None:
+                explainedPitchCollectionList.append(generalRestPitchColl)
+                pitchCollection.duration = pitchCollection.duration - generalRestPitchColl.duration 
+           
+        
+        ''' set section endTimes '''
+        explainedPitchCollectionList= self.setSectionEndTimes(explainedPitchCollectionList) 
         
         self.pitchCollSequence = PitchCollectionSequence(self.scoreTree, explainedPitchCollectionList)
         # logging.info ('Number of pitch collections: ' + str(len(explainedPitchCollectionList)) + ' current explanation ratio: ' + str(self.pitchCollSequence.explanationRatioList[-1]) +  ' current incoherence ratio: ' + str(self.pitchCollSequence.incoherenceRatioList[-1])) 
         
         self.pitchCollectionSequenceList.append(self.pitchCollSequence)
         
+        
+        
+    
+    def getSectionEndTimes (self, sectionEndMarkers = ["final", "double", "fermata"]):
+        '''this always takes into account the element's endTime: i.e. offset + duration in quarter length'''
+        
+        offsetList = [] 
+         
+        if "final" in sectionEndMarkers or "double" in sectionEndMarkers or "repeat" in sectionEndMarkers:
+            for measure in self.stream.semiFlat.getElementsByClass(stream.Measure):
+                if measure.rightBarline == None : continue
+                if measure.rightBarline.type in  ["final", "double"]: 
+                    highestTime = measure.duration.quarterLength + measure.offset
+                    if highestTime not in offsetList: 
+                        offsetList.append(highestTime)
+            
+        if "fermata" in sectionEndMarkers:
+            for noteElement in self.stream.flat.recurse().getElementsByClass (note.Note):
+                for elementExpression in noteElement.expressions:
+                    if elementExpression.name == "fermata":
+                        endTime = noteElement.offset + noteElement.duration.quarterLength
+            
+                        if endTime not in offsetList: offsetList.append(noteElement.offset) 
+             
+        return offsetList   
+    
+    def setSectionEndTimes (self, pitchCollList):
+        ''' identify structural elements i.e.  fermata, a double bar, a final bar etc. endtimes  '''
+        self.endTimeList = self.getSectionEndTimes()
+        
+        for pitchColl in pitchCollList:
+            if pitchColl.endTime in self.endTimeList:
+                pitchColl.isSectionEnd = True
+                
+        return pitchCollList
+        
+    
+    def getHighesOffsetInMeasure(self, mes, classFilter = [note.Note, note.Rest, chord.Chord]):
+        if hasattr(mes, "highestNoteOffset"):
+            if mes.highestNoteOffset > 0: return mes.highestNoteOffset
+        
+        ''' the getHighestOffset function in streams takes every element into account ''' 
+        ''' This has a filter function ''' 
+        highestOffset = 0
+        for noteElement in mes.getElementsByClass(classFilter):
+            if noteElement.offset > highestOffset: highestOffset = noteElement.offset
+            
+        mes.highestNoteOffset = highestOffset
+        
+        return highestOffset
+            
+        
+    
+    
+    
+    def getGeneralRestNextEvent (self, vert):
+        ''' checks if next event is a general rest and returns empty pitch coll if so  ''' 
+        
+        if vert.nextVerticality == None: return None
+        nextVert = vert.nextVerticality
+        nextVertOverlapTS = nextVert.overlapTimespans
+        nextVertStopTS = nextVert.stopTimespans
+        
+        if len (nextVertOverlapTS) == 0 and len (nextVertStopTS) == 0:
+            highestEndtime = 0
+            
+            ''' get highest offset of starts and overlaps '''
+            for ts in vert.startAndOverlapTimespans:
+                if ts.endTime > highestEndtime: highestEndtime = ts.endTime
+                
+            generalRestDuration = nextVert.offset - highestEndtime
+            generalRestOffset = highestEndtime
+            
+            
+       
+            return PitchCollection(None, [], generalRestDuration, generalRestOffset)
+            
+        
+        else:
+            return None
+        
+        ''' if next vert has no stop and no overlaps, the event between current verticality and next one is a general silence '''
+         
+        
+        
+        
+        
+        
+        
+    
     def createPitchCollection (self, verticality):
         
         analyzedPitchList = []
         verticalities = VerticalitySequence([None, verticality, None])
+        
         
         ''' check if verticality is consonant '''
         #=======================================================================
@@ -94,6 +205,9 @@ class PitchCollectionSequences(object):
                 analyzedPitch.attack = True if element in verticality.startTimespans else False
                 analyzedPitchList.append(analyzedPitch)
                 
+                 
+                
+                
                 if verticality.nextVerticality != None:
                     analyzedPitch.segmentQuarterLength = verticality.nextVerticality.offset - verticality.offset
                 else:
@@ -110,6 +224,12 @@ class PitchCollectionSequences(object):
                     analyzedPitch.attack = True if element in verticality.startTimespans else False
                     analyzedPitchList.append(analyzedPitch)
             
+            
+             
+                    
+        
+        
+        
         return PitchCollection(verticality, analyzedPitchList)
     
     def getAnalyzedPitches (self, sequence=0):
@@ -835,7 +955,11 @@ class PitchCollectionSequence (object):
         flatRootSream = stream.flat
         
         for pitchColl in self.explainedPitchCollectionList:    
-            rootNote = flatRootSream.getElementAtOrBefore(pitchColl.verticality.offset, note.Note)
+            if pitchColl.verticality == None: 
+                continue
+                
+            
+            rootNote = flatRootSream.getElementAtOrBefore(pitchColl.offset, note.Note)
             if rootNote ==None: continue
             pitchColl.rootPitch = rootNote.pitch
                 
@@ -1281,29 +1405,48 @@ class PitchCollectionSequence (object):
 
 class PitchCollection():
     ''' class stores and manages information about all pitches collected in a verticality ''' 
+    ''' also used to store information of general rest - in that case params offset and duration are requested '''
     
-    def __init__(self, verticality, analyzedPitchList, chordTemplates=None):
+    def __init__(self, verticality, analyzedPitchList, duration = None, offset = None):
         self.analyzedPitchList = analyzedPitchList
         self.verticality = verticality
-         
-        
-        ''' harmonic information '''
-        self.chord = verticality.toChord() 
-        self.chordHypothesisList = []
-        self.probability = 0 ### should be changed
-        self.template = None
+        self.chord = None
         self.rootPitch = None 
-        self.rep2PitchDictionary = None
-               
+        self.isSectionEnd = False
+        self.bass = None 
+        
         if verticality != None:
-            shortestEndTime = verticality.startAndOverlapTimespans[0].endTime
-            for element in verticality.startAndOverlapTimespans:
-                if element.endTime < shortestEndTime: shortestEndTime = element.endTime
-            self.duration = shortestEndTime - verticality.offset
+        
+            ''' harmonic information '''
+            self.chord = verticality.toChord() 
+            self.offset = verticality.offset 
+            self.bass = self.chord.bass()
+            
+                
+            if verticality.nextVerticality != None:
+                self.duration = verticality.nextVerticality.offset - verticality.offset
+            else:
+                self.duration = verticality.startTimespans[0].quarterLength
+        
+        else:
+            self.duration = duration
+            self.offset = offset
+            
+        self.endTime = self.offset + self.duration
+            
+            
+        
+   
+# alternative encoding does not handle breaks adequately     
+#         if verticality != None:
+#             shortestEndTime = verticality.startAndOverlapTimespans[0].endTime
+#             for element in verticality.startAndOverlapTimespans:
+#                 if element.endTime < shortestEndTime: shortestEndTime = element.endTime
+#             self.duration = shortestEndTime - verticality.offset
             
             
             
-        else: self.duration = 0
+        #else: self.duration = 0
     
     def addAnalyzedPitch (self, analyzedPitch):
         self.analyzedPitchList.append(analyzedPitch)

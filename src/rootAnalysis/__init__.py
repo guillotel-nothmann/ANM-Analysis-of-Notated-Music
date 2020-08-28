@@ -7,6 +7,7 @@ from music21.note import Note
 from music21 import note, chord, stream, clef, key, pitch
 from music21.pitch import Pitch
 from copy import deepcopy
+from music21.interval import Interval
 
 
 class RootAnalysis ():
@@ -18,8 +19,58 @@ class RootAnalysis ():
         self.overallScore = None
         self.lowestScore = None
         self.highestScore = None
+        self.rootDictionary = {}
+        
+  
     
         
+    
+    def populateRootDictionary (self):
+        
+        for pitchColl in self.pitchCollectionSequence.explainedPitchCollectionList:
+            
+            if pitchColl.rootPitch == None: continue
+        
+            ''' get corresponding root key'''
+            rootEntry = self.getRootDictionaryEntry(pitchColl.rootPitch.name)
+            
+            ''' compute interval between root and real bass '''
+            note1 = note.Note(pitchColl.rootPitch)
+            note2 = note.Note (pitchColl.bass)
+            
+            note1.octave = 1
+            note2.octave = 2
+            
+            note12Interval = Interval(note1, note2)
+            
+            ''' check if interval name exists in rootEntry if not add it '''
+            rootEntry = self.getRootDictionaryEntry(pitchColl.rootPitch.name)
+            
+            rootEntry["occurrence"] = rootEntry["occurrence"]  + 1
+            rootEntry["duration"] = rootEntry["duration"] + pitchColl.duration
+            
+            if note12Interval.simpleName in rootEntry:
+                rootEntry[note12Interval.simpleName] = rootEntry[note12Interval.simpleName] + pitchColl.duration
+            else:
+                rootEntry[note12Interval.simpleName] = pitchColl.duration
+            
+        
+    
+    
+    def getRootDictionaryEntry (self, rootName):
+         
+        
+        if rootName in self.rootDictionary:
+            return self.rootDictionary[rootName]
+        else:  
+            dicEntry = {
+                "occurrence": 0,
+                "duration": 0,
+                "root": rootName
+                }  
+            self.rootDictionary[rootName]= dicEntry
+            return dicEntry
+    
     
     def addRootInformation (self, rootStream):
         ''' this is used to add root information from individual stream to pitchCollectionSequence ''' 
@@ -57,6 +108,9 @@ class RootAnalysis ():
         
         for pitchCollection in self.pitchCollectionSequence.explainedPitchCollectionList:
             ''' loop over all analyzed pitches ''' 
+            
+            
+            ''' check if collection is not empty '''
                 
             ''' get observation list and put it in array '''                
             
@@ -195,7 +249,7 @@ class RootAnalysis ():
         
 
         for el in recurseIter:
-            if isinstance(el, (chord.Chord, note.Note)):
+            if isinstance(el, (chord.Chord, note.Note, note.Rest)):
                 chordifiedStream.remove(el, recurse=True)
         
     
@@ -206,6 +260,7 @@ class RootAnalysis ():
         ''' loop over vertices and add notes '''
    
         
+
         for pitchColl in self.pitchCollectionSequence.explainedPitchCollectionList:
             if pitchColl.rootPitch != None:
                 rootPitch = pitchColl.rootPitch
@@ -256,6 +311,7 @@ class RootAnalysis ():
          
         chordifiedStream.id = "Root"
         chordifiedStream.partName = 'Root'
+        chordifiedStream.name = "Root"
         chordifiedStream.partAbbreviation = 'R.'
         
 

@@ -29,15 +29,19 @@ class VectorAnalysis(object):
         
         self.pitchCollectionSequenceList = []
         self.chordSequenceList = []
+        self.pitchCollSubList = [] ### the pitch coll sequences is slided according to end sections 
        
         
         if type(pitchCollSequenceList) is not list: pitchCollSequenceList = [pitchCollSequenceList]
         self.pitchCollectionSequenceList = pitchCollSequenceList
         
         
-        ''' build chord sequence '''
-        for pitchCollSequences in self.pitchCollectionSequenceList:
-            chordSequ = ChordSequence(pitchCollSequences.pitchCollSequence)
+        
+        ''' slide pitch coll sequence in sections and compute chord sequences '''
+        self.setPitchCollSubsequences()      
+        
+        for pitchCollSubList in self.pitchCollSubList:
+            chordSequ = ChordSequence(pitchCollSubList)
             self.chordSequenceList.append(chordSequ)
         
         
@@ -45,12 +49,63 @@ class VectorAnalysis(object):
         self.vectorList = self._computeVectors() 
      
         self.vectorPopulation = self._setVectorCategories('interval')
-        self.longestPatterns = []
+        self.longestPatterns = [] 
         
 
         
         
     
+    
+    
+    def setPitchCollSubsequences (self):
+        ''' build chord sequence '''
+       
+        self.pitchCollSubList.append([])
+        
+        for counter,  pitchColl in enumerate(self.pitchCollectionSequenceList[0].pitchCollSequence.explainedPitchCollectionList): 
+            
+            ''' cut if general rest '''
+            if pitchColl.rootPitch == None:  
+                self.pitchCollSubList.append([]) 
+                continue 
+            
+            self.pitchCollSubList[-1].append(pitchColl)
+            
+            ''' cut if sequence end '''
+            if pitchColl.isSectionEnd == True and len (self.pitchCollectionSequenceList[0].pitchCollSequence.explainedPitchCollectionList) != counter +1:
+                self.pitchCollSubList.append([])  
+    
+    
+    def getVectorDictionary (self, vectorCategory):
+         
+            
+        categoryDictionary = {
+            "name": vectorCategory.name,
+            "occurrence": vectorCategory.occurrence,
+            "subcategories": []
+            }
+        
+        for subcategory in vectorCategory.subCategories:
+            categoryDictionary["subcategories"].append (self.getVectorDictionary(subcategory))
+            
+        return categoryDictionary
+            
+     
+    def getFlatVectorDictionary (self, vectorCategory, vectorDictionary = {}):
+        
+        categoryDictionary = {
+            "name": vectorCategory.name,
+            "occurrence": vectorCategory.occurrence
+            }
+        
+        vectorDictionary [vectorCategory.name] = categoryDictionary
+        
+        for subcategory in vectorCategory.subCategories:
+            self.getFlatVectorDictionary(subcategory, vectorDictionary)
+            
+        return vectorDictionary
+             
+        
     
     
     def show(self, representationType = "text", percents = False, threshold = 0):
@@ -70,6 +125,13 @@ class VectorAnalysis(object):
                     for intervalType in interval.subCategories:
                         logging.info  ('\t\t\t' + str (intervalType.name) + ': ' + str(intervalType.occurrence/ratio))
                         
+        elif representationType == 'dict': # returns dictionary analysisObject 
+            vectorDictionary = self.getFlatVectorDictionary(self.vectorPopulation)
+            return vectorDictionary
+            
+            
+        
+        
         elif representationType == 'xml':
             ratio = population.occurrence
             xmlString = '<population name="%s" occurrence="%s" percentage="%s">' %(population.name, population.occurrence, round (population.occurrence/ratio, 4))
@@ -854,8 +916,8 @@ class Chord():
         
         self.rootPitch = pitchCollList[0].rootPitch 
         self.pitchCollList = pitchCollList
-        self.lowestOffset = pitchCollList[0].verticality.offset
-        self.highestOffet = pitchCollList[-1].verticality.offset
+        self.lowestOffset = pitchCollList[0].offset
+        self.highestOffet = pitchCollList[-1].offset
         self.duration = 0
         
         for pitchColl in pitchCollList :
@@ -864,30 +926,30 @@ class Chord():
        
  
 class ChordSequence ():
-    def __init__ (self, pitchCollSequence):
+    def __init__ (self, pitchCollSubList):
         ''' this class is used to gather information about succession of chords '''
-        ''' it takes as input a pitchCollSequence and this collection in a chord sequence according to the pitchCOll roots '''
-        self.pitchCollSequence = pitchCollSequence
+        ''' it takes as input a pitchCollSequence. this collection in a chord sequence according to the pitchCOll roots '''
+        self.pitchCollSubList = pitchCollSubList
         self.chordList = []
         
         rootChangeIndex = 0
         
         
-        for pitchCollCounterOne in  range (len (self.pitchCollSequence.explainedPitchCollectionList)):
+        for pitchCollCounterOne in  range (len (self.pitchCollSubList)):
             if pitchCollCounterOne != rootChangeIndex: continue
             
             
-            currentPitchColl = self.pitchCollSequence.explainedPitchCollectionList[pitchCollCounterOne]
+            currentPitchColl = self.pitchCollSubList[pitchCollCounterOne]
             currentRoot = currentPitchColl.rootPitch
             pitchCollList = []
             
-            for pitchCollCounterTwo in range (pitchCollCounterOne, len(self.pitchCollSequence.explainedPitchCollectionList)):
-                followingPitchColl = self.pitchCollSequence.explainedPitchCollectionList[pitchCollCounterTwo]
+            for pitchCollCounterTwo in range (pitchCollCounterOne, len(self.pitchCollSubList)):
+                followingPitchColl = self.pitchCollSubList[pitchCollCounterTwo]
                 followingRoot = followingPitchColl.rootPitch
                 
                 if currentRoot == followingRoot:
                     pitchCollList.append(followingPitchColl)
-                    if pitchCollCounterTwo == len(self.pitchCollSequence.explainedPitchCollectionList)-1: 
+                    if pitchCollCounterTwo == len(self.pitchCollSubList)-1: 
                         self.chordList.append(Chord(pitchCollList))
                     
                     
