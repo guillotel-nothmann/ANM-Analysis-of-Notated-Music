@@ -25,7 +25,8 @@ class CompareParts(object):
         self.otherStreamsDictionary = {}
         
         self.structuralParts = {} ### this contains structured information aboput cantus, altus, tenor and bassus parts (and others)
-        
+        self.measureOffsetList = []
+        self.partNameList = []
         
         
         
@@ -33,6 +34,8 @@ class CompareParts(object):
         ''' loop over all parts and put them in corresponding dictionaries '''
         
         for part in self.workStream.recurse().getElementsByClass(stream.Part): 
+            
+            if part.partName not in self.partNameList: self.partNameList.append(part.partName)
             
             if re.search('cantus', part.partName, re.IGNORECASE):
                 self.cantusStreamsDictionary[part.partName]=part
@@ -62,29 +65,60 @@ class CompareParts(object):
         
         for unused_partKey, part in self.cantusStreamsDictionary.items():
             for measure in part.recurse().getElementsByClass(stream.Measure):
+                if measure.offset not in self.measureOffsetList: self.measureOffsetList.append(measure.offset)
                 self.addMeasure("Cantus", part.partName, measure)
                 
         for unused_partKey, part in self.altusStreamsDictionary.items():
             for measure in part.recurse().getElementsByClass(stream.Measure):
+                if measure.offset not in self.measureOffsetList: self.measureOffsetList.append(measure.offset)
                 self.addMeasure("Altus", part.partName, measure)
         
         for unused_partKey, part in self.tenorStreamsDictionary.items():
             for measure in part.recurse().getElementsByClass(stream.Measure):
+                if measure.offset not in self.measureOffsetList: self.measureOffsetList.append(measure.offset)
                 self.addMeasure("Tenor", part.partName, measure)
                 
         for unused_partKey, part in self.bassusStreamsDictionary.items():
             for measure in part.recurse().getElementsByClass(stream.Measure):
+                if measure.offset not in self.measureOffsetList: self.measureOffsetList.append(measure.offset)
                 self.addMeasure("Bassus", part.partName, measure)
                 
                 
         for unused_partKey, part in self.otherStreamsDictionary.items():
             for measure in part.recurse().getElementsByClass(stream.Measure):
+                if measure.offset not in self.measureOffsetList: self.measureOffsetList.append(measure.offset)
                 self.addMeasure("Other", part.partName, measure)
             
         
+        
+        
+        if "Cantus" in self.structuralParts:
+            structuralPartCantus = self.structuralParts["Cantus"]
+            structuralPartCantus.partDictionary = self.cantusStreamsDictionary
+        
+        
+        if "Altus" in self.structuralParts:
+            structuralPartAltus = self.structuralParts["Altus"]
+            structuralPartAltus.partDictionary = self.altusStreamsDictionary
+        
+        if "Tenor" in self.structuralParts:
+            structuralPartTenor = self.structuralParts["Tenor"]
+            structuralPartTenor.partDictionary = self.tenorStreamsDictionary
+        
+        if "Bassus" in self.structuralParts:
+            structuralPartBassus = self.structuralParts["Bassus"]
+            structuralPartBassus.partDictionary = self.bassusStreamsDictionary
+        
+        if "Other" in self.structuralParts:
+            structuralPartOther = self.structuralParts["Other"]
+            structuralPartOther.partDictionary = self.otherStreamsDictionary
+            
+        
+        
+        
         ''' identify combinations '''
                 
-        for structuralPartKey, structuralPart in self.structuralParts.items():
+        for unused_structuralPartKey, structuralPart in self.structuralParts.items():
             structuralPart.analyzeGroups()
         
         
@@ -107,46 +141,97 @@ class CompareParts(object):
         measureCont.addMeasure (structuralPartName, partName, measure) 
         
         
-    def show(self):
+    def show(self, output = "partsMeasure"):
         
-        measureString = "\t"
-        structuralPart = self.structuralParts["Cantus"]
+        if output == "groupsMeasure":
         
-        for unused_key, measure in structuralPart.measures.items():
-            measureString = measureString + str (measure.measureNumber) + " (" + str(measure.offset) + ")\t"
+            measureString = "\t"
+            structuralPart = self.structuralParts["Cantus"]
             
-        print (measureString)
-        
-        
-        for partName in ["Cantus", "Tenor", "Altus", "Bassus", "Other"]:
-        
-            if partName not in self.structuralParts: continue
-            
-            structuralPart = self.structuralParts[partName]
-            
-            
+            for unused_key, measure in structuralPart.measures.items():
+                measureString = measureString + str (measure.measureNumber) + " (" + str(measure.offset) + ")\t"
                 
+            print (measureString)
             
-            for combination in structuralPart.combinationList:
-                if len (combination.split(";"))<2: continue
+            
+            for partName in ["Cantus", "Tenor", "Altus", "Bassus", "Other"]:
+            
+                if partName not in self.structuralParts: continue
+                
+                structuralPart = self.structuralParts[partName]
                 
                 
-                combinationString = combination + "\t"
-                occurrenceCounter = 0
-                for unused_key, measure in structuralPart.measures.items():
-                    combinationBool = False
-                    for unused_key2, groupCont in measure.partGroups.items():
-                        if groupCont.presentationName == combination:
-                            combinationString = combinationString + "X\t"
-                            occurrenceCounter = occurrenceCounter + 1
-                            combinationBool = True
-                            break
-                    if combinationBool == False: combinationString = combinationString + "\t"
+                    
                 
-                print (combinationString + "\t" + str(occurrenceCounter))
+                for combination in structuralPart.combinationList:
+                    if len (combination.split(";"))<2: continue
+                    
+                    
+                    combinationString = combination + "\t"
+                    occurrenceCounter = 0
+                    for unused_key, measure in structuralPart.measures.items():
+                        combinationBool = False
+                        for unused_key2, groupCont in measure.partGroups.items():
+                            if groupCont.presentationName == combination:
+                                combinationString = combinationString + "X\t"
+                                occurrenceCounter = occurrenceCounter + 1
+                                combinationBool = True
+                                break
+                        if combinationBool == False: combinationString = combinationString + "\t"
+                    
+                    print (combinationString + "\t" + str(occurrenceCounter))
+                    
+        elif output == "partsMeasure":
+            
+            partMesDict = {}
+            
+            
+            ''' loop over every measure offset '''
+            for measureOffset in self.measureOffsetList:
+                measureList = []
+                ''' loop over every part '''
+                for partName in self.partNameList:
+                    ''' get part group at offset '''
+                    partGroupName = self.getPartGroupNameAtMeasureOffset(partName, measureOffset)
+                    measureList.append(partGroupName)
+                
+                partMesDict [measureOffset] = measureList
+                
+            return partMesDict
+    
+                    
+                    
+                
+            
+             
+            
+                
             
             
              
+    
+    def getPartGroupNameAtMeasureOffset (self, partName, measureOffset):
+        ''' returns the part's group container at offset '''
+        
+        
+        ''' check to what structural part the part belongs to '''
+ 
+        
+        for unused_structuralPartKey, structuralPart in self.structuralParts.items():
+            for partKey in structuralPart.partDictionary:
+                if partKey == partName:
+                    partGroup = structuralPart.getPartGroupAtMeasureOffset(partName, measureOffset) 
+                    
+                    if partGroup== "": 
+                        return ""                    
+                    else: return partGroup.groupIndex
+                    
+        return ""
+            
+     
+            
+            
+        
             
             
         
@@ -164,6 +249,7 @@ class PartContainer (object):
     ''' 
     def __init__(self, partName):     
         self.partName = partName
+        self.partDictionary = {}
         self.measures = {}  ### offset is key 
         self.maxGroups = 0
         self.minGroups = 100
@@ -179,6 +265,21 @@ class PartContainer (object):
                 if groupCont.presentationName not in self.combinationList: self.combinationList.append(groupCont.presentationName) 
             
         self.combinationList.sort()
+        
+    
+    def getPartGroupAtMeasureOffset (self, partName, offset):
+        ''' returns the corresponding part group container for one part at a given offset''' 
+        
+        for unusedPartGroupKey, groupCont in self.measures[offset].partGroups.items():
+            if partName in groupCont.parts:
+                if len (groupCont.parts)> 1:
+                    return groupCont 
+                else: return ""
+            
+        return ""
+                
+        
+        
             
             
             

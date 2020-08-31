@@ -164,14 +164,14 @@ class RootAnalysis ():
         ''' loop over reference stream check every note '''     
         flatRefStream = referenceStream.flat
            
-        for referenceNote in flatRefStream.getElementsByClass(note.Note):
+        for referenceNote in flatRefStream.getElementsByClass([note.Note, note.Rest]):
             lyricString = ""
             heterogeneous=False
             #
             '''loop over other streams '''
             for analysis in analysisList:
                 flatAnalysis = analysis[0].flat
-                analysisNote = flatAnalysis.getElementAtOrBefore(referenceNote.offset, note.Note) 
+                analysisNote = flatAnalysis.getElementAtOrBefore(referenceNote.offset, [note.Note, note.Rest]) 
                 lyricString = lyricString + "\r" + analysis[1] + ":" + analysisNote.name
                 
                 if referenceNote.name != analysisNote.name: heterogeneous = True

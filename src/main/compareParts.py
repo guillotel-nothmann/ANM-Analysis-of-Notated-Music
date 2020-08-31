@@ -5,6 +5,7 @@ Show which parts are identical, show which parts are not within a stream
 '''
 
 import os
+import pandas as pd
 
 from music21 import converter
 from reduction.compareParts import CompareParts
@@ -26,7 +27,10 @@ for file in os.listdir(workDirectoryString):
     
     
     partsComp = CompareParts(workStream)
-    partsComp.show()
+    dataDictionary = partsComp.show()
     
-    print (partsComp)
+ 
+    
+    df = pd.DataFrame(data=dataDictionary)
+    df.to_excel(workBookPath)  
     

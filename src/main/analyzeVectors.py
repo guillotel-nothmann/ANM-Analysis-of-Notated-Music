@@ -153,10 +153,7 @@ for workDataCounter, workData in enumerate (analyzedWorksList):
            
 
 
-json = json.dumps(dataDictionary)
-f = open("dict.json","w")
-f.write(json)
-f.close()            
+         
             
 df = pd.DataFrame(data=dataDictionary)
 df.to_excel(workBookPath)  
