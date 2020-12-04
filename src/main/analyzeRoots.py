@@ -26,8 +26,8 @@ rootDirectoryName = directoryName(directoryName(directoryName(__file__)))
 #workDirectoryString = '/Users/christophe/Dropbox/WTBach/'
 #outputDirectoryString = '/Users/christophe/Dropbox/HarmonisationsBach/analyseModèle/'
 
-workDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/tests/'
-outputDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/'
+workDirectoryString = '/Users/christophe/Documents/Praetorius/Musae Sioniae/xml/'
+outputDirectoryString = '/Users/christophe/Documents/Praetorius/Musae Sioniae/roots/'
 
 modelPath = '/Users/christophe/Documents/GitHub/PolyMIR/models/rootModel16072020.h5'
 rootModel = keras.models.load_model(modelPath)

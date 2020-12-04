@@ -20,6 +20,7 @@ from music21.chord import Chord
 from music21.tree.timespanTree import TimespanTree
 from music21.languageExcerpts.instrumentLookup import transposition
 from email.charset import SHORTEST
+from music21.figuredBass import notation 
  
 
 class PitchCollectionSequences(object):
@@ -353,12 +354,14 @@ class PitchCollectionSequence (object):
         self.explanationRatioList = []
         self.incoherenceRatioList = []
         self.probabilityRatioList = []
+        self.duration = None
         self.totalPitches = 0
         self.idDictionary = {}  # ## maps note or chord id to analyzedPitches (one note or chord can have several analytical interpretations according to offset) 
         self.callId = None
         self.rootMap = []  # stores data about roots from a start offset to an end offset
         self.name = None 
         self.exploredHypothesisList = []  # a list of pitch hypotheses already explored
+        self.finalisRoot = None
     
     def getDissonancesAtOffset (self, offset):
         ''' returns identified dissonances starting before current offset and resolving after this offset '''
@@ -377,6 +380,347 @@ class PitchCollectionSequence (object):
                     if analyzedPitch.resolutionOffset != None:
                         analyzedDissonancesList.append(analyzedPitch)
         return analyzedDissonancesList 
+    
+#     def setRootDegreeFromReferencePitch (self, referencePitch):
+#         
+#         stepDictionary = {}
+#         
+#         ''' associate final chord to I and and create dictionary of all other scale steps'''
+#         
+#         if isinstance(referencePitch, str):
+#             rootPitch = pitch.Pitch(referencePitch)
+#         
+#         referenceStep = rootPitch.step
+#         
+#         diatonicSteps = ["A", "B", "C", "D", "E", "F", "G"]
+#         referenceIndex = None
+#         
+#         for counter, diatonicStep in enumerate(diatonicSteps):
+#             if diatonicStep == referenceStep: referenceIndex = counter
+#                 
+#         stepDictionary[diatonicSteps [referenceIndex]] = "I" 
+#         stepDictionary[ diatonicSteps [(referenceIndex + 1) % 7]] = "II"
+#         stepDictionary [diatonicSteps [(referenceIndex + 2) % 7]] = "III"
+#         stepDictionary [diatonicSteps [(referenceIndex + 3) % 7]] = "IV"
+#         stepDictionary [diatonicSteps [(referenceIndex + 4) % 7]] = "V"
+#         stepDictionary [diatonicSteps [(referenceIndex + 5) % 7]] = "VI"
+#         stepDictionary [diatonicSteps [(referenceIndex + 6) % 7]] = "VII"
+#        
+#         
+#          
+#         ''' given a root, this deduces the roman numeral from a given finalis Root '''
+#         for pitchColl in self.explainedPitchCollectionList:
+#             if pitchColl.rootPitch != None:
+#                 pitchColl.romanNumeral = stepDictionary[pitchColl.rootPitch.step]
+                
+    def getDiatonicDegreesDictionary(self):
+        self.diatonicDegreesDictionary = {}
+        
+        for pitchColl in self.explainedPitchCollectionList:
+            if not pitchColl.bassDiatonicDegree in self.diatonicDegreesDictionary: self.diatonicDegreesDictionary[pitchColl.bassDiatonicDegree] = {
+                "name": pitchColl.bassDiatonicDegree,
+                "pitchCollections": [],
+                "harmonizations": {},
+                "duration": 0
+                } 
+            
+            diatonicDegreeDictionaryEntry = self.diatonicDegreesDictionary[pitchColl.bassDiatonicDegree]
+            
+            diatonicDegreeDictionaryEntry["pitchCollections"].append(pitchColl)
+            diatonicDegreeDictionaryEntry["duration"] = diatonicDegreeDictionaryEntry["duration"] +  pitchColl.duration
+            
+            continuoSigns = pitchColl.getSimpleFilteredContinuoSigns()
+            if continuoSigns == "": continuoSigns = "[None]"
+            
+            harmonizationDictionary = diatonicDegreeDictionaryEntry["harmonizations"]
+            
+            if not continuoSigns in harmonizationDictionary:
+                harmonizationDictionary[continuoSigns] = {
+                    "name": continuoSigns,
+                    "pitchCollections": [],
+                    "duration": 0
+                    }
+            harmonization = diatonicDegreeDictionaryEntry["harmonizations"][continuoSigns]
+            harmonization["duration"] = harmonization["duration"] + pitchColl.duration
+            harmonization["pitchCollections"].append (pitchColl)
+                
+        return self.diatonicDegreesDictionary
+                
+    
+    
+    
+    def setRealBassDiatonicDegree (self, scale):
+        stepDictionary = {}
+        
+        diatonicSteps = [scalePitch.name for scalePitch in scale.pitches]
+        
+        for stepCounter, diatonicStep in enumerate(diatonicSteps):
+            if diatonicStep in stepDictionary: continue
+            
+            stepDictionary[diatonicStep ] = str(stepCounter + 1)
+            
+            dimU = interval.Interval("d1")
+            augU = interval.Interval("a1")
+            
+            dimU.noteStart = note.Note(diatonicStep)
+            augU.noteStart = note.Note(diatonicStep)
+        
+            flatDegree = dimU.noteEnd 
+            sharpDegree = augU.noteEnd
+            
+            stepDictionary[flatDegree.name] = str(stepCounter + 1)+"-"
+            stepDictionary[sharpDegree.name] = str(stepCounter + 1)+"#"
+            
+        for pitchColl in self.explainedPitchCollectionList:
+            realBassPitch = pitch.Pitch(pitchColl.bass) 
+            
+            if realBassPitch.name in stepDictionary:
+                pitchColl.bassDiatonicDegree = stepDictionary[realBassPitch.name]
+            else: 
+                pitchColl.bassDiatonicDegree = "?"
+                    
+                
+            
+            
+            
+            
+            
+            
+                           
+                
+                    
+    
+    
+    def setRealbassScaleDegreeFromReferencePitch (self, scale, referencePitch):  
+        
+        stepDictionary = {}
+        
+        ''' adds root degree e.g. romann numerals, given scale  and a reference pitch, '''
+        
+        if isinstance(referencePitch, str):
+            rootPitch = pitch.Pitch(referencePitch)
+        
+        referenceStep = rootPitch
+        
+        diatonicSteps = [scalePitch.name for scalePitch in scale.pitches]
+        referenceIndex = None
+        
+        for counter, diatonicStep in enumerate(diatonicSteps):
+            if diatonicStep == referenceStep.name: referenceIndex = counter
+                
+        stepDictionary[diatonicSteps [referenceIndex]] = "1" 
+        stepDictionary[ diatonicSteps [(referenceIndex + 1) % 7]] = "2"
+        stepDictionary [diatonicSteps [(referenceIndex + 2) % 7]] = "3"
+        stepDictionary [diatonicSteps [(referenceIndex + 3) % 7]] = "4"
+        stepDictionary [diatonicSteps [(referenceIndex + 4) % 7]] = "5"
+        stepDictionary [diatonicSteps [(referenceIndex + 5) % 7]] = "6"
+        stepDictionary [diatonicSteps [(referenceIndex + 6) % 7]] = "7"
+        
+        ''' add chromatic steps ''' 
+        chomaticDictionary = {}
+        alterationDictionary ={}
+        
+        for diatonicStepKey, diatonicStep in  stepDictionary.items():
+            dimU = interval.Interval("d1")
+            augU = interval.Interval("a1")
+            
+            dimU.noteStart = note.Note(diatonicStepKey)
+            augU.noteStart = note.Note(diatonicStepKey)
+        
+            flatDegree = dimU.noteEnd 
+            sharpDegree = augU.noteEnd
+            
+            chomaticDictionary[flatDegree.name] = diatonicStep + "-"
+            chomaticDictionary[sharpDegree.name] = diatonicStep + "#"
+            
+            alterationDictionary[flatDegree.name] =  "-"
+            alterationDictionary[sharpDegree.name] = "#"
+            
+            
+            
+        ''' add items to step dict ''' 
+        for degreeKey, degree in  chomaticDictionary.items():
+            stepDictionary[degreeKey]= degree 
+        
+         
+        ''' set scale degree numbers accordingly in dic '''
+        for pitchColl in self.explainedPitchCollectionList:
+            
+            realBassPitch = pitch.Pitch(pitchColl.bass) 
+            if realBassPitch.name in stepDictionary: 
+                pitchColl.bassScaleDegree = stepDictionary[realBassPitch.name]
+        
+                
+            ''' loop over intervals '''
+            for pitchCollInt in pitchColl.intervalsToBass:
+                genericSimpleName = str(pitchCollInt.generic.simpleUndirected)
+                pitchColl.simpleContinuoSigns.append(genericSimpleName)
+                
+                 
+                
+                endNote=  pitchCollInt.noteEnd
+                
+                ''' if  end note is not diatonic step, add alteration or ?  '''
+                if endNote.name in diatonicSteps: 
+                    pass
+                elif endNote.name in alterationDictionary:
+                    genericSimpleName = str(genericSimpleName) + alterationDictionary[endNote.name]
+                else: 
+                    genericSimpleName = str(genericSimpleName) + "?"
+                
+                if genericSimpleName not in pitchColl.continuoSigns:
+                    pitchColl.continuoSigns.append(genericSimpleName)
+                    
+            pitchColl.continuoSigns.sort()
+                
+                
+                     
+                
+    def analyzeRealBassMovements (self):
+        '''  used to retrieve scale degree successions with figured bass '''
+        self.continuoSuccessionDict = {} 
+        self.motionDictionary = {
+            "step_5=>5": [],
+            "step_6=>6": [],
+            "step_6<=>5": [],
+            "leep_5=>5": [],
+            "leep_6=>6": [],
+            "leep_6<=>5": [], 
+            "+m2_6=>5": [],
+            "+m2_other":[],
+            "-m2_5=>6": [],
+            "-m2_other": []
+            }
+        
+        
+        pitchCollCounter = 0  
+        while pitchCollCounter < len(self.explainedPitchCollectionList)-1:
+            pitchCollA = self.explainedPitchCollectionList[pitchCollCounter]
+            pitchCollB = self.explainedPitchCollectionList[pitchCollCounter + 1]
+            
+            if pitchCollA.bassScaleDegree == pitchCollB.bassScaleDegree: 
+                pitchCollCounter = pitchCollCounter + 1
+                continue  
+            
+            if pitchCollA.verticality == None or  pitchCollB.verticality == None:
+                pitchCollCounter = pitchCollCounter + 1
+                continue  
+                 
+            
+            ''' continuo successions '''
+            
+            pitchCollASign = pitchCollA.getSimpleFilteredContinuoSigns()
+            pitchCollBSign = pitchCollB.getSimpleFilteredContinuoSigns()
+            
+            continuoNotationA = pitchCollA.bassScaleDegree + "_" + pitchCollASign
+            continuoNotationB = pitchCollB.bassScaleDegree + "_" + pitchCollBSign
+            degreeSuccession = pitchCollA.bassScaleDegree + "_" + pitchCollB.bassScaleDegree
+            
+            
+            successionKey = continuoNotationA + "=>" + continuoNotationB
+            
+            if not degreeSuccession in self.continuoSuccessionDict: self.continuoSuccessionDict[degreeSuccession] ={
+                "name" : degreeSuccession,
+                "firstScaleDegreeName": pitchCollA.bassScaleDegree,
+                "secondScaleDegreeName" : pitchCollB.bassScaleDegree,
+                "pitchCollectionPairs": [],
+                "harmonizations": {}
+                } 
+            
+            continuoSuccessionDictEntry = self.continuoSuccessionDict[degreeSuccession]
+            continuoSuccessionDictEntry["pitchCollectionPairs"].append([pitchCollA, pitchCollB]) 
+            
+            continuoSuccessionHarmonization = continuoSuccessionDictEntry["harmonizations"]
+            
+            if not successionKey in continuoSuccessionHarmonization: continuoSuccessionHarmonization[successionKey] = {
+                "name": successionKey,
+                "firstHarmonizationName": pitchCollASign,
+                "secondHarmonizationName": pitchCollBSign, 
+                "pitchCollectionPairs": [] 
+                }
+            
+            harmonizationSuccession = continuoSuccessionHarmonization[successionKey]
+            harmonizationSuccession["pitchCollectionPairs"].append([pitchCollA, pitchCollB])
+            
+            ''' motion analysis ''' 
+            ''' check if step '''
+            bassInterval = interval.Interval(pitchCollA.bass, pitchCollB.bass)
+            
+            if bassInterval.directedSimpleName in ["m2", "M-7"]:  #
+            
+                if pitchCollASign  in ["6", "64", "65"] and pitchCollBSign == "":
+                    self.motionDictionary["+m2_6=>5"].append([pitchCollA, pitchCollB])
+                else: 
+                    self.motionDictionary["+m2_other"].append([pitchCollA, pitchCollB])
+                    
+            elif bassInterval.directedSimpleName in ["m-2", "M7"]:
+                if pitchCollASign == "" and pitchCollBSign in ["6", "64", "65"]:
+                    self.motionDictionary["-m2_5=>6"].append([pitchCollA, pitchCollB])
+                else: 
+                    self.motionDictionary["-m2_other"].append([pitchCollA, pitchCollB])  
+                
+            
+            
+            
+           
+            
+            motion = "leep"
+            if bassInterval.simpleName in ["M2", "m2", "M7", "m7"]: motion = "step"
+            
+            continuoSign = ""
+            ''' check continuo signs '''
+            
+           
+            
+            
+            if pitchCollASign == "" and pitchCollBSign == "": continuoSign = "5=>5"
+            elif pitchCollASign in ["6", "64", "65"] and pitchCollBSign in ["6", "64", "65"]: continuoSign = "6=>6"            
+            elif pitchCollASign == ""  and pitchCollBSign in ["6", "64", "65"]: continuoSign = "6<=>5"
+            elif pitchCollASign in ["6", "64", "65"] and pitchCollBSign == "" : continuoSign = "6<=>5"
+            else:
+                pitchCollCounter = pitchCollCounter + 1 
+                continue 
+            
+            
+            self.motionDictionary[motion + "_" + continuoSign].append([pitchCollA, pitchCollB])
+            
+ 
+            
+            pitchCollCounter = pitchCollCounter + 1 
+        
+        
+   
+        
+        
+         
+         
+        
+    
+    def getContinuoDictionary (self, dictionaryType = "simple"):
+        continuoDictionary = {}
+        
+        for pitchColl in self.explainedPitchCollectionList:
+            
+            
+            if dictionaryType == "simple":
+                continuoNotation = pitchColl.bassScaleDegree + "_" + pitchColl.getSimpleFilteredContinuoSigns()
+            
+            
+            else:
+            
+                continuoNotation = pitchColl.bassScaleDegree+str(pitchColl.continuoSigns)
+            
+            if continuoNotation not in continuoDictionary:
+                continuoDictionary[continuoNotation] = pitchColl.duration
+            else:
+                continuoDictionary[continuoNotation] =continuoDictionary[continuoNotation] + pitchColl.duration
+                
+        return continuoDictionary
+            
+            
+        
+        
+       
     
     def getAnalyzedCollections (self, startOffset=None, stopOffset=None, templateRepresentation=None, probabilityThreshold=None):
         pitchCollList = []
@@ -810,6 +1154,7 @@ class PitchCollectionSequence (object):
             pitchCollection = pitchCollectionList[index]
             
             if pitchCollection == None: continue  # in that case all values remain zero 
+            print(pitchCollection.offset)
             deepestPitchClass = pitchCollection.getBassPitch().step  # get deepest pitch class
             
             ''' loop over every analyzed pitch '''
@@ -1414,6 +1759,14 @@ class PitchCollection():
         self.rootPitch = None 
         self.isSectionEnd = False
         self.bass = None 
+        self.bassScaleDegree = None
+        self.bassDiatonicDegree = None
+       
+        
+        self.intervalsToBass = []
+        self.continuoSigns = [] # very simplified for now
+        self.simpleContinuoSigns = []
+        self.romanNumeral = None
         
         if verticality != None:
         
@@ -1422,6 +1775,15 @@ class PitchCollection():
             self.offset = verticality.offset 
             self.bass = self.chord.bass()
             
+            bassNote = note.Note (self.bass.name)
+            bassNote.octave = 0
+            
+            for vertPitch in verticality.pitchSet:
+                vertNote = note.Note(vertPitch.name)
+                vertNote.octave = 1
+            
+                bassNoteInt = interval.Interval(bassNote, vertNote)
+                self.intervalsToBass.append(bassNoteInt) 
                 
             if verticality.nextVerticality != None:
                 self.duration = verticality.nextVerticality.offset - verticality.offset
@@ -1448,6 +1810,10 @@ class PitchCollection():
             
         #else: self.duration = 0
     
+    
+    
+    
+    
     def addAnalyzedPitch (self, analyzedPitch):
         self.analyzedPitchList.append(analyzedPitch)
         self.setBestHypotheses()
@@ -1466,6 +1832,34 @@ class PitchCollection():
             if analyzedPitch.probability < 1: explanationString = explanationString + "(" + str(analyzedPitch.probability) + ") "
                 
         return explanationString    
+    
+    
+    def getSimpleFilteredContinuoSigns(self):
+        hasFourth = "4" in self.simpleContinuoSigns
+        hasFifth = "5" in self.simpleContinuoSigns
+        hasSixth = "6" in self.simpleContinuoSigns
+        hasSecond = "2" in self.simpleContinuoSigns
+        hasSeventh = "7" in self.simpleContinuoSigns
+         
+        ''' doubles '''
+        if hasFifth == True and hasSixth == True:
+            return "65"
+        
+        elif hasFourth == True and hasSixth == True:
+            return "64"
+        
+        elif hasSixth == True:
+            return "6"
+        
+        elif hasSecond == True and hasFourth:
+            return "24"
+        
+        elif hasSeventh == True:
+            return "7"
+        
+        else: return ""
+        
+        
     
     def getAnalyzedPitch (self, pitch):
         for analyzedPitch in self.analyzedPitchList:

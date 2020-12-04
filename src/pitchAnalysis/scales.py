@@ -12,6 +12,7 @@ class ScaleAnalysis(object):
         
         ''' create analysis object and get analyzed pitch list'''
         analysisObject = pitchCollections.PitchCollectionSequences(work, False, False) #   adaptable frame,  hypotheses explored 
+        self.pitchCollectionSequences = analysisObject
         self.workAnalyzedPitches = analysisObject.getAnalyzedPitches()
         
         
@@ -40,7 +41,10 @@ class ScaleAnalysis(object):
         ''' build zalzal scale on all chromatic ptiches '''
         print ('')    
     
-         
+ 
+                
+    
+    
     def buildScaleOn (self, refNote, scaleIntervals): 
         newNote = refNote
         noteList = [newNote]

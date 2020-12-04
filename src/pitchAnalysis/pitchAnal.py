@@ -61,6 +61,11 @@ class PitchAnalysis ():
             
             if "pitch." in attributeName:
                 attributeValue = str (getattr(instance.pitch, attributeName.replace("pitch.", "")))
+            
+            elif "part." in attributeName:
+                attributeValue = str (getattr(instance.part, attributeName.replace("part.", "")))
+                
+            
             else:
                 attributeValue = str (getattr(instance, attributeName))
                 
@@ -184,6 +189,12 @@ class PitchAnalysis ():
             if "pitch." in attributeName:
                 if subCollection.attributeValue == str (getattr(analyzedPitch.pitch, attributeName.replace("pitch.", ""))):
                     return subCollection
+            elif "part." in attributeName:
+                if subCollection.attributeValue == str (getattr(analyzedPitch.part, attributeName.replace("part.", ""))):
+                    return subCollection
+                
+            
+            
             else:
                 if subCollection.attributeValue == str (getattr(analyzedPitch, attributeName)):
                     return subCollection
@@ -233,7 +244,10 @@ class pitchSubCollection ():
         if analyzedPitch == None or attributeName == None: return
         
         if "pitch." in attributeName:
-            self.attributeValue = str (getattr(analyzedPitch.pitch, attributeName.replace("pitch.", "")))
+            self.attributeValue = str(getattr(analyzedPitch.pitch, attributeName.replace("pitch.", "")))
+        elif "part." in attributeName:
+            self.attributeValue = str(getattr(analyzedPitch.part, attributeName.replace("part.", "")))
+        
         else:
             self.attributeValue = str(getattr(analyzedPitch, attributeName))
     

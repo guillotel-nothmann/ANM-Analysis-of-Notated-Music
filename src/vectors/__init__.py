@@ -48,7 +48,7 @@ class VectorAnalysis(object):
         ''' compute vectors and set categories '''
         self.vectorList = self._computeVectors() 
      
-        self.vectorPopulation = self._setVectorCategories('interval')
+        self.vectorPopulation = self._setVectorCategories('vectorInterval')
         self.longestPatterns = [] 
         
 
@@ -102,6 +102,9 @@ class VectorAnalysis(object):
         
         for subcategory in vectorCategory.subCategories:
             self.getFlatVectorDictionary(subcategory, vectorDictionary)
+            
+            
+            
             
         return vectorDictionary
              
@@ -569,6 +572,21 @@ class VectorAnalysis(object):
                         vectorIntervalCategroy.addToSubCategory(vector, vector.vector.specificName) 
                     
         
+        if structureType == "vectorInterval":
+            ''' VD / VS '''
+            for vector in self.vectorList:
+                vectorPopulation.addToSubCategory(vector, vector.category)
+                vectorPopulation.vectorList.append(vector)
+                vectorPopulation.setOccurence()
+                
+            
+            ''' intervals '''
+            vectorTypeCategories = vectorPopulation.subCategories
+            for vectorTypeCategory in vectorTypeCategories:
+                for vector in vectorTypeCategory.vectorList:
+                    vectorTypeCategory.addToSubCategory (vector, vector.vector.generic.directed)  
+        
+        
         if structureType == 'intervalNatureChord':
             
             
@@ -588,6 +606,10 @@ class VectorAnalysis(object):
                     
         
         if structureType == 'interval':
+            
+            
+            
+            
             for vector in self.vectorList:
                 vectorPopulation.addToSubCategory(vector, vector.vector.generic.directed) #directedSimpleName
                 vectorPopulation.vectorList.append(vector)

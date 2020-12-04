@@ -757,13 +757,17 @@ class ModalEnsemble(object):
         
     def setCadences(self, cadenceAnal):
         self.cadences = cadenceAnal
-        self.intermediaryCadences = self.cadences.getIntermediaryCadences()
-        self.finalChord = self.cadences.getFinalCadence()
-        if self.finalChord != None:
-            self.finalChordRoot = self.finalChord[0].root().name
-        else: self.rootPitch = None
-        self.cadenceSuccession = self.cadences.getDegrees("succession")
-        self.cadencePoints = self.cadences.getDegrees("points")
+        self.intermediaryCadences = self.cadences.getCadences(None, "intermediary", None)
+        self.finalCadence = self.cadences.getCadences (None, "final", None)
+        if len (self.finalCadence) != 0: 
+            self.finalChordRoot = self.finalCadence[0]["cadenceChord"]
+            self.rootPitch = self.finalCadence[0]["cadenceRoot"]
+        else:
+            self.finalChordRoot = None
+            self.rootPitch = None
+        
+        self.cadenceSuccession = None #self.cadences.getDegrees("succession")
+        self.cadencePoints = None #self.cadences.getDegrees("points")
     
          
         

@@ -4,7 +4,7 @@ import logging
 import reduction
 from tensorflow import keras
 from music21.note import Note
-from music21 import note, chord, stream, clef, key, pitch
+from music21 import note, chord, stream, clef, key, pitch, interval
 from music21.pitch import Pitch
 from copy import deepcopy
 from music21.interval import Interval
@@ -20,6 +20,7 @@ class RootAnalysis ():
         self.lowestScore = None
         self.highestScore = None
         self.rootDictionary = {}
+      
         
   
     
@@ -53,8 +54,75 @@ class RootAnalysis ():
                 rootEntry[note12Interval.simpleName] = rootEntry[note12Interval.simpleName] + pitchColl.duration
             else:
                 rootEntry[note12Interval.simpleName] = pitchColl.duration
+    
+ 
+    
+    def getRootCorrespondingToScaleDegree (self, scaleDegree):
+        
+        for unused_elementKey, element in self.rootDictionary.items():
+            if element["degree"] == scaleDegree: return element
             
         
+        return None
+    
+    def setRootDegreeFromReferencePitch (self, scale, referencePitch):
+        
+        stepDictionary = {}
+        
+        ''' adds root degree e.g. romann numerals, given scale  and a reference pitch, '''
+        
+        if isinstance(referencePitch, str):
+            rootPitch = pitch.Pitch(referencePitch)
+        
+        referenceStep = rootPitch
+        
+        diatonicSteps = [scalePitch.name for scalePitch in scale.pitches]
+        referenceIndex = None
+        
+        for counter, diatonicStep in enumerate(diatonicSteps):
+            if diatonicStep == referenceStep.name: referenceIndex = counter
+                
+        stepDictionary[diatonicSteps [referenceIndex]] = "I" 
+        stepDictionary[ diatonicSteps [(referenceIndex + 1) % 7]] = "II"
+        stepDictionary [diatonicSteps [(referenceIndex + 2) % 7]] = "III"
+        stepDictionary [diatonicSteps [(referenceIndex + 3) % 7]] = "IV"
+        stepDictionary [diatonicSteps [(referenceIndex + 4) % 7]] = "V"
+        stepDictionary [diatonicSteps [(referenceIndex + 5) % 7]] = "VI"
+        stepDictionary [diatonicSteps [(referenceIndex + 6) % 7]] = "VII"
+        
+        ''' add chromatic steps ''' 
+        chomaticDictionary = {}
+        
+        for diatonicStepKey, diatonicStep in  stepDictionary.items():
+            dimU = interval.Interval("d1")
+            augU = interval.Interval("a1")
+            
+            dimU.noteStart = note.Note(diatonicStepKey)
+            augU.noteStart = note.Note(diatonicStepKey)
+        
+            flatDegree = dimU.noteEnd 
+            sharpDegree = augU.noteEnd
+            
+            chomaticDictionary[flatDegree.name] = diatonicStep + "-"
+            chomaticDictionary[sharpDegree.name] = diatonicStep + "#"
+            
+            
+            
+        ''' add items to step dict ''' 
+        for degreeKey, degree in  chomaticDictionary.items():
+            stepDictionary[degreeKey]= degree 
+        
+         
+        ''' set roman numerals accordingly in dic '''
+        for rootKey, rootEntry in self.rootDictionary.items():
+            
+            rootPitch = pitch.Pitch(rootKey) 
+            if rootPitch.name in stepDictionary: 
+                rootEntry ["degree"] = stepDictionary[rootPitch.name]
+                
+            else:
+                rootEntry ["degree"] =   "other"
+    
     
     
     def getRootDictionaryEntry (self, rootName):

@@ -6,7 +6,7 @@ Created on Aug 27, 2020
 
 import re
 
-from music21 import stream 
+from music21 import stream, note, interval
 
 class CompareParts(object):
     '''
@@ -15,7 +15,7 @@ class CompareParts(object):
     '''
 
 
-    def __init__(self, workStream):
+    def __init__(self, workStream, ignoreInst = False):
         self.workStream = workStream
         
         self.cantusStreamsDictionary = {}
@@ -37,7 +37,15 @@ class CompareParts(object):
             
             if part.partName not in self.partNameList: self.partNameList.append(part.partName)
             
-            if re.search('cantus', part.partName, re.IGNORECASE):
+            
+            
+            if ignoreInst == True:
+                if re.search('inst', part.partName, re.IGNORECASE) or re.search('continuus', part.partName, re.IGNORECASE):
+                    self.otherStreamsDictionary[part.partName]=part  
+                    continue
+            
+            
+            if re.search('cantus', part.partName, re.IGNORECASE): 
                 self.cantusStreamsDictionary[part.partName]=part
             
             elif re.search('altus', part.partName, re.IGNORECASE):
@@ -52,13 +60,13 @@ class CompareParts(object):
             else:
                 self.otherStreamsDictionary[part.partName]=part  
                 
-        print ("Cantus parts: " + str(len(self.cantusStreamsDictionary)))
-        print ("Altus parts: " + str(len(self.altusStreamsDictionary)))
-        print ("Tenor parts: " + str(len(self.tenorStreamsDictionary)))
-        print ("Bassus parts: " + str(len(self.bassusStreamsDictionary)))
+        #print ("Cantus parts: " + str(len(self.cantusStreamsDictionary)))
+        #print ("Altus parts: " + str(len(self.altusStreamsDictionary)))
+        #print ("Tenor parts: " + str(len(self.tenorStreamsDictionary)))
+        #print ("Bassus parts: " + str(len(self.bassusStreamsDictionary)))
         
         for streamPart in self.otherStreamsDictionary:
-            print ("Could not identify the following parts: " + streamPart.partName)
+            print ("Could not identify the following parts: " + streamPart)
             
             
         ''' compare parts '''
@@ -141,6 +149,52 @@ class CompareParts(object):
         measureCont.addMeasure (structuralPartName, partName, measure) 
         
         
+    def getAmbitusDictionary(self):
+        self.ambitusDictionary= {}
+        
+        for unused_partkey, structuralPartCont in self.structuralParts.items():
+            highStream = stream.Stream()
+            lowStream = stream.Stream()
+            
+            for unused_partName, part in structuralPartCont.partDictionary.items():
+                ambitusInt = part.analyze("ambitus")
+                
+                if ambitusInt == None: continue
+                
+                if ambitusInt.noteEnd != None:   highStream.append(note.Note(ambitusInt.noteEnd))  
+                if ambitusInt.noteStart != None: lowStream.append (note.Note(ambitusInt.noteStart))
+     
+                
+            
+            ambitusHighInt = highStream.analyze("ambitus")
+            ambitusLowInt = lowStream.analyze("ambitus")
+            
+            
+            if ambitusHighInt != None : 
+                highestPitch = ambitusHighInt.noteEnd.nameWithOctave
+            else:
+                highestPitch = None
+                
+            if ambitusLowInt != None:
+                lowestPitch = ambitusLowInt.noteStart.nameWithOctave
+            else: lowestPitch = None
+            
+            if lowestPitch==None or highestPitch==None:
+                ambInt = None
+                
+            else:
+                ambInt = interval.Interval(note.Note(lowestPitch), note.Note(highestPitch)).name
+                
+                
+            
+            
+            self.ambitusDictionary[structuralPartCont.partName] = {"low": lowestPitch, "high": highestPitch, "interval": ambInt}
+            
+        return self.ambitusDictionary
+    
+    
+    
+    
     def show(self, output = "partsMeasure"):
         
         if output == "groupsMeasure":
@@ -151,7 +205,7 @@ class CompareParts(object):
             for unused_key, measure in structuralPart.measures.items():
                 measureString = measureString + str (measure.measureNumber) + " (" + str(measure.offset) + ")\t"
                 
-            print (measureString)
+             
             
             
             for partName in ["Cantus", "Tenor", "Altus", "Bassus", "Other"]:
@@ -179,7 +233,7 @@ class CompareParts(object):
                                 break
                         if combinationBool == False: combinationString = combinationString + "\t"
                     
-                    print (combinationString + "\t" + str(occurrenceCounter))
+                    #print (combinationString + "\t" + str(occurrenceCounter))
                     
         elif output == "partsMeasure":
             

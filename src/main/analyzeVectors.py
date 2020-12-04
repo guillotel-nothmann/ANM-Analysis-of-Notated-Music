@@ -28,8 +28,8 @@ def getListFromDictionary(dataDictionary, dictionaryKey):
 if __name__ == '__main__':
     pass
 
-workWithRootDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/testRoots/'
-workDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/normalized/'
+workWithRootDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/testWithRoot/'
+workDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/test/'
 workBookPath = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/rootsAndVectors.xlsx'
 
 
@@ -71,12 +71,12 @@ for file in os.listdir(workWithRootDirectoryString):
     workWithoutRoot.remove(rootStream, recurse=True)
     
     if workWithoutRoot.duration.quarterLength != workWithRoot.duration.quarterLength:
-        continue
         print (fileName + ": Offsets of root stream and other streams do not match")
         corrputedFilesList.append(fileName)
+        continue
         
     
-    ''' create PirtchCollectionSequencesObject and add root information '''
+    ''' create PitchCollectionSequencesObject and add root information '''
     pitchCollectionSequences = pitchCollections.PitchCollectionSequences(workWithoutRoot)
     pitchCollectionSequences.setRootsFromStream(rootStream) 
     
@@ -158,6 +158,7 @@ for workDataCounter, workData in enumerate (analyzedWorksList):
 df = pd.DataFrame(data=dataDictionary)
 df.to_excel(workBookPath)  
        
+print (corrputedFilesList)
         
     
     
