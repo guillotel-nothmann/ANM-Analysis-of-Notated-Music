@@ -349,6 +349,7 @@ class PitchCollectionSequences(object):
 class PitchCollectionSequence (object):
     
     def __init__(self, scoreTree, pitchCollectionList):
+        self.id = id(self)
         self.scoreTree = scoreTree
         self.explainedPitchCollectionList = pitchCollectionList
         self.explanationRatioList = []
@@ -1189,7 +1190,8 @@ class PitchCollectionSequence (object):
                 contextList[index][chromaticStep][5] = contextList[index][chromaticStep][5] + 1 
                 
                 ''' 7. dissonancePattern ''' 
-                if analyzedPitch.pitchType == "CN" : contextList[index][chromaticStep][6] =1
+                if hasattr(analyzedPitch, "pitchType"):
+                    if analyzedPitch.pitchType == "CN" : contextList[index][chromaticStep][6] =1
                 
                 '''8 octave location (octaves 0 to 10) '''
                 contextList[index][chromaticStep][7 + analyzedPitch.pitch.octave] = contextList[index][chromaticStep][7 + analyzedPitch.pitch.octave] + 1
@@ -1753,6 +1755,7 @@ class PitchCollection():
     ''' also used to store information of general rest - in that case params offset and duration are requested '''
     
     def __init__(self, verticality, analyzedPitchList, duration = None, offset = None):
+        self.id = id(self)
         self.analyzedPitchList = analyzedPitchList
         self.verticality = verticality
         self.chord = None
@@ -1761,12 +1764,11 @@ class PitchCollection():
         self.bass = None 
         self.bassScaleDegree = None
         self.bassDiatonicDegree = None
-       
-        
+        self.rootDegree = None 
         self.intervalsToBass = []
         self.continuoSigns = [] # very simplified for now
         self.simpleContinuoSigns = []
-        self.romanNumeral = None
+        #self.romanNumeral = None
         
         if verticality != None:
         
@@ -2089,28 +2091,28 @@ class Pitch():
     ''' these pitches are grouped in a verticality (class AnalyzedPitchCollection)'''
     
     def __init__(self, pitch, verticalities, hypothesisList=[]):
-        self.horizontalities = None
-        self.elementsStartingList = []
+        #self.horizontalities = None
+        #self.elementsStartingList = []
         self.accentuated = None
-        self.pitchType = None
-        self.pitchSubType = None
-        self.verticalities = verticalities
+        #self.pitchType = None
+        #self.pitchSubType = None
+        #self.verticalities = verticalities
         self.offset = verticalities[1].offset
         self.pitch = pitch
-        self.harmonicNote = False
-        self.probability = -1
+        #self.harmonicNote = False
+        #self.probability = -1
         self.segmentQuarterLength = 0
         # self.isConsonant = False
-        self.resolutionOffset = None
-        self.preparationOffset = None
-        self.preparationPitch = None
-        self.resolutionPitch = None 
-        self.preparationPitchID = None
-        self.resolutionPitchID = None
-        self.hypothesisList = hypothesisList
-        self.explained = False
-        self.hypothesesChecked = False
-        if len (hypothesisList) > 0:  self.setBestHypothesis()
+        #self.resolutionOffset = None
+        #self.preparationOffset = None
+        #self.preparationPitch = None
+        #self.resolutionPitch = None 
+        #self.preparationPitchID = None
+        #self.resolutionPitchID = None
+        #self.hypothesisList = hypothesisList
+        #self.explained = False
+        #self.hypothesesChecked = False
+        #if len (hypothesisList) > 0:  self.setBestHypothesis()
         self.id = None
         self.part = None
         self.voice = None

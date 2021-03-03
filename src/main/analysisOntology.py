@@ -32,6 +32,19 @@ import types
 
 ''' Ontology methods'''
 
+
+def unabbreviateTriple (triple):
+    return [unabbreviateNode(triple[0]), unabbreviateNode(triple[1]),  unabbreviateNode(triple[2])]
+        
+def unabbreviateNode (tripleNode):
+    if isinstance(tripleNode, int): 
+        element1 = onto._unabbreviate(tripleNode)
+    else: 
+        element1 = triple
+    
+    return element1
+        
+
 def getIndividualFromId (individual):
     return onto.search_one(hasId = individual.id)  
 
@@ -64,11 +77,12 @@ def addOntologyObjectProperty (propertyName, propertyRange):
 
 def createPartAnalysisInstance (work): 
     partAnalysisInstance = partAnalysisClass()
-    partAnalysisInstance.versionInfo.append("partAnalysisVersion:04122020")
     partCollectionInstance = partCollectionClass()
     partAnalysisInstance.hasPartCollection.append(partCollectionInstance)
     partsAnal = ClefsAndKeysAnalysis(work)   
     partsClefsAndKeys = partsAnal.analyzedPartsDictionary
+    partAnalysisInstance.versionInfo = partsAnal.__version__
+    
     
     for analyzedPart in partsClefsAndKeys.values():
         analyzedPartInstance = partClass()
@@ -96,27 +110,45 @@ def createScaleAnalysisInstance(work):
         partBestScale = partScaleAnalysis.getBestDiatonicScale()
         analyzedPartInstance.hasBestDiatonicScale.append(str(partBestScale))   
     return [scaleAnalysisInstance, scaleAnal, bestScale]   
+
+
+''' cadence analysis '''
+def createCadenceAnalysis(work):
+    cadenceAn= Cadences(work, barLines= True)
+    cadenceAnalysisInstance = cadenceAnalysisClass() 
+    for cadenceKey, cadence in cadenceAn.cadencePointDictionary.items():
+        cadenceInstance = cadenceClass()
+        cadenceInstance.hasId = [str(cadenceKey)]
+        cadenceInstance.hasOffset = [float(cadence["cadenceOffset"])]
+        cadenceInstance.hasCadenceType = [str(cadence["cadenceType"])]
+        cadenceInstance.hasCadenceSubType = [str(cadence["cadenceSubType"])]
+        cadenceInstance.hasFinalScaleDegree = [str(cadence['cadenceDegree'])]
+        cadenceInstance.hasFinalChord = [str(cadence['cadenceChord'])]
+        cadenceInstance.hasFinalRoot = [str(cadence['cadenceRoot'])]
+        cadenceAnalysisInstance.hasCadence.append(cadenceInstance)
+        
+    return cadenceAnalysisInstance
+
         
 ''' pitch collection sequence '''
 def createAnalyzedPitchCollectionSequence (pitchCollSequence):
-    
     analyzedPitchCollectionSequenceInstance = analyzedPitchCollectionSequenceClass()
     
+    
+    analyzedPitchCollectionSequenceInstance.hasId.append(pitchCollSequence.id)
     for pitchColl in pitchCollSequence.explainedPitchCollectionList:
         analyzedPitchCollectionSequenceInstance.hasAnalyzedPitchCollection.append(createAnalyzedPitchCollection(pitchColl))
-    
-    
-    
     return analyzedPitchCollectionSequenceInstance
+
 
 def createAnalyzedPitchCollection(pitchColl):
     analyzedPitchCollectionInstance = analyzedPitchCollectionClass()
-    
     analyzedPitchCollectionInstance.hasId.append(id (pitchColl))
     analyzedPitchCollectionInstance.hasDuration.append( pitchColl.duration)
     analyzedPitchCollectionInstance.hasEndTime.append( pitchColl.endTime)
     analyzedPitchCollectionInstance.hasOffset.append( pitchColl.offset)
-    analyzedPitchCollectionInstance.hasRootPitch.append(str(pitchColl.rootPitch))
+    analyzedPitchCollectionInstance.isSectionEnd.append(pitchColl.isSectionEnd)
+    analyzedPitchCollectionInstance.hasRealBass.append(str(pitchColl.bass))
     
     for analyzedPitch in pitchColl.analyzedPitchList:
         analyzedPitchCollectionInstance.hasAnalyzedPitch.append(createAnalyzedPitch(analyzedPitch))
@@ -136,6 +168,15 @@ def createAnalyzedPitch (analPitch):
     return analyzedPitchInstance
     
 
+def updateAnalyzedPitchCollectionSequence (pitchCollSequence):
+    for pitchColl in pitchCollSequence.explainedPitchCollectionList:
+        updateAnalyzedPitchCollection(pitchColl)
+
+def updateAnalyzedPitchCollection (pitchColl):
+    analyzedPitchCollectionInstance = getIndividualFromId (pitchColl)
+    analyzedPitchCollectionInstance.hasRootPitch.append(str(pitchColl.rootPitch))
+    analyzedPitchCollectionInstance.hasContinuoSigns.append(str(pitchColl.continuoSigns))
+    analyzedPitchCollectionInstance.hasRootScaleDegree.append(str(pitchColl.rootDegree)) 
 
 ''' vector analysis '''
 def createVectorAnalysisInstance (vectorAnalysis): 
@@ -185,7 +226,7 @@ if __name__ == '__main__':
     pass
 
 now = datetime.now()
-ontoIRI = "http://modality-tonality.huma-num.fr/fr/analysis/praetorius1619.owl"
+ontoIRI = "http://modality-tonality.huma-num.fr/ontology/analysis"
 onto = get_ontology(ontoIRI)
 
  
@@ -194,7 +235,7 @@ onto = get_ontology(ontoIRI)
 dt_string = now.strftime("%d%m%Y_%H%M")
 ''' folder '''
 directroyString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/ontologyTest/'
-worksWithRootPath = "/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/ontologyTesWithRoot/"
+#worksWithRootPath = "/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/ontologyTesWithRoot/"
 workBookPath  = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/results/' + dt_string + '.xlsx'
 ontologyName = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/results/' + dt_string + '.rdf'
 
@@ -205,7 +246,7 @@ ontologyName = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/results/' + dt_s
 
 
 ''' add classes corpus, work'''
-corpusAnalysisClass = addOntologyClass(Thing, "CoprusAnalysis")
+corpusAnalysisClass = addOntologyClass(Thing, "CorpusAnalysis")
 workClass = addOntologyClass(corpusAnalysisClass, "Work")
 
 
@@ -231,7 +272,6 @@ analyzedPitchCollectionSequenceClass = addOntologyClass(pitchAnalysisClass, "Ana
 analyzedPitchCollectionClass =  addOntologyClass(analyzedPitchCollectionSequenceClass, "AnalyzedPitchCollection")
 analyzedPitchClass = addOntologyClass(analyzedPitchCollectionClass, "AnalyzedPitch")
 pitchListClass = addOntologyClass(pitchAnalysisClass, "PitchList")
-
 
 
 ''' root analysis ''' 
@@ -269,6 +309,7 @@ modalClassificationClass = addOntologyClass(modalAnalysisClass, "ModalClassifica
 '''str '''
 addOntologyDataProperty("hasId", [str]) # metadata
 addOntologyDataProperty("hasFileName", [str]) # metadata
+addOntologyDataProperty("hasURL", [str]) # metadata
 addOntologyDataProperty("hasTitle", [str]) # metadata
 addOntologyDataProperty("hasComposer", [str]) # metadata
 addOntologyDataProperty("hasWork", [str])
@@ -285,8 +326,9 @@ addOntologyDataProperty("isCategory", [str])
 addOntologyDataProperty("hasRootPitch", [str])
 addOntologyDataProperty("hasPartName", [str])
 addOntologyDataProperty("hasAttack", [str])
-
-
+addOntologyDataProperty("isSectionEnd", [str])
+addOntologyDataProperty("hasRealBass", [str])
+addOntologyDataProperty("hasContinuoSigns", [str])
 addOntologyDataProperty("hasEndTime", [float])
 
 ''' cadence analysis'''
@@ -298,7 +340,7 @@ addOntologyDataProperty("hasCadenceSubType", [str]) #
 
 ''' root analysis '''
 addOntologyDataProperty("hasRoot", [str])
-addOntologyDataProperty("hasScaleDegree", [str])
+addOntologyDataProperty("hasRootScaleDegree", [str])
 
 
 ''' real bass analysis '''
@@ -419,14 +461,14 @@ for file in dirList:
     
     
     filename = os.fsdecode(file)
-    if filename.endswith(".musicxml")== False: continue
+    if filename.endswith(".mei")== False: continue
     
     #if filename != "011.musicxml": continue
 
     print ("Analyzing file : " + str(filename) + " " + str(analysisCounter)) 
     
     
-    work = converter.parse('%s%s' %(directroyString, filename))
+    work = converter.parse('%s%s' %(directroyString, filename), forceSource= True)
     
     md = work.metadata.all()
     
@@ -435,38 +477,15 @@ for file in dirList:
     
    
     
-    
-    ''' check if file exists in directory '''
-    try:
-        workWithRoot  = converter.parse('%s%s' %(worksWithRootPath, filename))
-        
-    except FileNotFoundError:
-            # doesn't exist
-        print ("No root analysis file. Skipping this file ....")  
-        continue      
-    else:   
-        rootStream = None
-        for part in workWithRoot.parts:
-            if part.partName == "Root":
-                rootStream = part
-                break
-            
-        if rootStream == None: 
-            print ("No roots. Skipping this file ....")  
-            continue  
-        
-    if work.duration.quarterLength != workWithRoot.duration.quarterLength:   
-        print ("Works do not match... Skipping this file ....")  
-    
-    
- 
-    
     ''' metadata '''
     workClassInstance = workClass()
     workClassInstance.hasFileName = [str(filename)]
     workClassInstance.hasComposer = [str(work.metadata.composer)] 
     workClassInstance.hasTitle = [str(work.metadata.title)] 
     workClassInstance.hasMeasureNumber = [int(work.finalBarline[0].measureNumber)]
+    
+    
+    
        
     
     ''' part analysis '''
@@ -502,24 +521,14 @@ for file in dirList:
         
 
     ''' cadence analysis '''
-    cadenceAn= Cadences(work, barLines= True)
-    cadenceAnalysisInstance = cadenceAnalysisClass() 
-    for cadenceKey, cadence in cadenceAn.cadencePointDictionary.items():
-        cadenceInstance = cadenceClass()
-        cadenceInstance.hasId = [str(cadenceKey)]
-        cadenceInstance.hasOffset = [float(cadence["cadenceOffset"])]
-        cadenceInstance.hasCadenceType = [str(cadence["cadenceType"])]
-        cadenceInstance.hasCadenceSubType = [str(cadence["cadenceSubType"])]
-        cadenceInstance.hasFinalScaleDegree = [str(cadence['cadenceDegree'])]
-        cadenceInstance.hasFinalChord = [str(cadence['cadenceChord'])]
-        cadenceInstance.hasFinalRoot = [str(cadence['cadenceRoot'])]
-        cadenceAnalysisInstance.hasCadence.append(cadenceInstance)
+    cadenceAnalysisInstance = createCadenceAnalysis(work)
     workClassInstance.hasCadenceAnalysis.append(cadenceAnalysisInstance)
         
      
     
     ''' root and progression analysis ''' 
-    scaleAnal.pitchCollectionSequences.setRootsFromStream(rootStream)  
+    #scaleAnal.pitchCollectionSequences.setRootsFromStream(rootStream)  
+    
     rootAnal = rootAnalysis.RootAnalysis(scaleAnal.pitchCollectionSequences)
     referencePitch = rootAnal.pitchCollectionSequence.explainedPitchCollectionList[-1].rootPitch.name # careful, careful !!!
     rootAnal.populateRootDictionary() 
@@ -533,11 +542,10 @@ for file in dirList:
         rootCollectionInstance.hasOccurrence = [rootCollection['occurrence']] 
         rootCollectionInstance.hasDuration = [rootCollection['duration']] 
         rootCollectionInstance.hasRoot = [rootCollection['root']] ### this should be deduced from final cadence ?
-        rootCollectionInstance.hasScaleDegree = [rootCollection['degree']] 
+        rootCollectionInstance.hasRootScaleDegree = [rootCollection['degree']] 
         
         # inversions
         rootAnalysisInstance.hasRootCollection.append(rootCollectionInstance)
-        
     rootAndProgressionAnalysisInstance.hasRootAnalysis.append(rootAnalysisInstance) 
    
     
@@ -620,14 +628,16 @@ for file in dirList:
 
            
     
+    ''' update pitch collection sequence '''
+    updateAnalyzedPitchCollectionSequence(scaleAnal.pitchCollectionSequences.pitchCollSequence)
     
     
     
-    
-    
-    print ()
+    for triple in onto.get_triples(scaleAnalysisInstance.storid, None, None):
+        print (unabbreviateTriple(triple))
 
-
+    
+    
 
 
 onto.save(file = ontologyName, format = "rdfxml")

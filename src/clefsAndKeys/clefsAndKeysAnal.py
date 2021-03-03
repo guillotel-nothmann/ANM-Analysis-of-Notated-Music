@@ -10,6 +10,9 @@ class ClefsAndKeysAnalysis(object):
 
 
     def __init__(self, work):
+        
+        self.__version__ = "01082020"
+        self.__author__="PolyMIR"
         self.work = work
         self.OverallAmbitus = None
         self.analyzedParts  = [] # contains all parts of the work
@@ -19,6 +22,7 @@ class ClefsAndKeysAnalysis(object):
         ''' loop over parts and stor them in list '''
         for part in self.work.parts:
             self.analyzedParts.append(ClefsAndKeysForPart(part))
+             
             
         
         self.analyzedPartsDictionary = {}
@@ -126,11 +130,17 @@ class ClefsAndKeysForPart (object):
     def __init__ (self, part):
         
         self.part = part
-        self.partName = part.partName
         self.clef = None
         self.ambitus = None
         self.key = None
         self.finalis = None
+        self.partName = None
+        
+        
+        ''' part name '''
+        if hasattr(part , "partName"): self.partName = part.partName
+        
+        
         
         
         ''' get clef '''

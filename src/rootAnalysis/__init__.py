@@ -12,7 +12,7 @@ from music21.interval import Interval
 
 class RootAnalysis ():
 
-    def __init__(self, pitchCollectionSequences):
+    def __init__(self, pitchCollectionSequences, analyzeWithModel = True):
         self.pitchCollectionSequences = pitchCollectionSequences
         self.pitchCollectionSequence =  pitchCollectionSequences.pitchCollSequence
         self.scoreTree = self.pitchCollectionSequence.scoreTree
@@ -20,6 +20,9 @@ class RootAnalysis ():
         self.lowestScore = None
         self.highestScore = None
         self.rootDictionary = {}
+        
+        
+        if analyzeWithModel == True: self.analyzeWithModel()
       
         
   
@@ -122,7 +125,17 @@ class RootAnalysis ():
                 
             else:
                 rootEntry ["degree"] =   "other"
-    
+        
+        ''' add roman numerals to pitch collections '''
+        for pitchCollection in self.pitchCollectionSequence.explainedPitchCollectionList:
+            if pitchCollection.rootPitch == None:
+                continue
+            
+            if pitchCollection.rootPitch.name in stepDictionary: 
+                pitchCollection.rootDegree = stepDictionary[pitchCollection.rootPitch.name]
+                
+            else:
+                pitchCollection.rootDegree = None
     
     
     def getRootDictionaryEntry (self, rootName):
@@ -156,18 +169,27 @@ class RootAnalysis ():
             else:
                 print ("Cannot add root information")
              
-    def analyzeWithModel(self, model):
+    def analyzeWithModel(self, modelPath = '/Users/christophe/Documents/GitHub/PolyMIR/models/rootModel16072020.h5'):
          
         #self.featuresPath = 'dissonanceNeuralNetwork/observations.npy' 
         #self.labelsPath = 'dissonanceNeuralNetwork/labels.npy'
          
         
+        ### requires tensforflow 1.6
+        ### keras==2.1.3 
+
+        labelDict = {0:"C-", 1:"C", 2:"C#", 3:"D-", 4:"D", 5:"D#", 6:"E-", 7:"E", 8:"E#", 9:"F-", 10:"F", 11:"F#", 12:"G-", 13:"G", 14:"G#", 15:"A-", 16:"A", 17:"A#", 18:"B-", 19:"B", 20:"B#"}
+            
+        
         ''' run model '''
         #self.features = np.load(self.featuresPath)
         #self.labels = np.load(self.labelsPath)
-    
         
-        self.model = model
+        
+        self.model = keras.models.load_model(modelPath)
+        self.model.compile(optimizer="adam",  loss='sparse_categorical_crossentropy',metrics=['accuracy'])
+        #rootModel.compile(optimizer=tf.train.AdamOptimizer(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        self.model.summary()
         
         
         scoreList = [] 
@@ -194,7 +216,6 @@ class RootAnalysis ():
                 if predictions[0][index] == highestScore:
                     break
             
-            labelDict = {0:"C-", 1:"C", 2:"C#", 3:"D-", 4:"D", 5:"D#", 6:"E-", 7:"E", 8:"E#", 9:"F-", 10:"F", 11:"F#", 12:"G-", 13:"G", 14:"G#", 15:"A-", 16:"A", 17:"A#", 18:"B-", 19:"B", 20:"B#"}
             #print ("offset: " + str(pitchCollection.verticality.offset) + " prediction: " + labelDict[index] + " score: " + str(highestScore))
             
             pitchCollection.rootPitch = Pitch(labelDict[index])
@@ -211,6 +232,9 @@ class RootAnalysis ():
         self.overallScore = scoreTotal / len (scoreList)
         self.lowestScore = scoreList[0]
         self.highestScore = scoreList [-1]
+        
+        
+        
             
     
     @staticmethod
