@@ -14,12 +14,9 @@ from music21 import converter
 from modalAnalysis.modes import ModalEnsemble
 import rootAnalysis
 from vectors import VectorAnalysis
-
-from openpyxl import Workbook    
-#from networkx.classes.function import degree
-import copy
-from builtins import isinstance
-from bs4 import element 
+   
+#from networkx.classes.function import degree 
+from builtins import isinstance 
 from datetime import datetime
 #from django.contrib.messages.api import success
 from owlready2 import get_ontology, Thing, ObjectProperty, DataProperty
@@ -244,26 +241,21 @@ ontologyName = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/results/' + dt_s
 #workBookPath  = '/Users/christophe/Documents/Praetorius/Musae Sioniae/' + dt_string + '.xlsx'
 #ontologyName = '/Users/christophe/Documents/Praetorius/Musae Sioniae/' + dt_string + '.rdf'
 
-
 ''' add classes corpus, work'''
 corpusAnalysisClass = addOntologyClass(Thing, "CorpusAnalysis")
 workClass = addOntologyClass(corpusAnalysisClass, "Work")
 
-
 ''' part analysis '''
 partAnalysisClass = addOntologyClass(workClass, "PartAnalysis")
 partCollectionClass = addOntologyClass(partAnalysisClass, "PartCollection")
-partClass = addOntologyClass(partCollectionClass, "Part") 
-
+partClass = addOntologyClass(partCollectionClass, "Part")
 
 ''' scale analysis '''
 scaleAnalysisClass = addOntologyClass(workClass, "ScaleAnalysis")
 
-
 ''' cadences analysis '''
 cadenceAnalysisClass = addOntologyClass(workClass, "CadenceAnalysis")
-cadenceClass = addOntologyClass(cadenceAnalysisClass, "Cadence") 
-
+cadenceClass = addOntologyClass(cadenceAnalysisClass, "Cadence")
 
 ''' pitch analysis '''
 
