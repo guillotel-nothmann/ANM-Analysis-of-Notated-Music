@@ -21,562 +21,156 @@ from music21.tree.timespanTree import TimespanTree
 from music21.languageExcerpts.instrumentLookup import transposition
 from email.charset import SHORTEST
 from music21.figuredBass import notation 
+from itertools import combinations
  
 
-class PitchCollectionSequences(object):
-
-    def __init__(self, work, adaptableFrame=False, exploreHypothesis=False):
-        ''' create stream and AVL tree, get chord Templates '''
-        
-        self.stream = work
-        self.semiFlatStream = self.stream.semiFlat
-        # self.scoreTree=self.stream.asTimespans(classList=(note.Note, chord.Chord))
-        self.scoreTree = tree.fromStream.asTimespans(self.stream, flatten=True, classList=(note.Note, chord.Chord))
-        
-        self.pitchCollectionSequenceList = []
-        self.adaptableFrame = adaptableFrame
-        self.exploreHypothesis = exploreHypothesis
-        self.endTimeList = []
-        
-        
-        ''' Create AnalyzedPitchCollectionSequence  '''
-        explainedPitchCollectionList = []
-        logging.info ('Creating pitch collections...') 
-        for verticality in self.scoreTree.iterateVerticalities():
-            
-            ''' check if next event is not general break  '''
-            generalRestPitchColl = self.getGeneralRestNextEvent(verticality)
-            
-
-            
-            
-            
-            ''' create pitch collection '''
-            pitchCollection = self.createPitchCollection (verticality)
-            explainedPitchCollectionList.append(pitchCollection)
-            
-            ''' adjust offset and duration if general rest exists '''
-            if generalRestPitchColl != None:
-                explainedPitchCollectionList.append(generalRestPitchColl)
-                pitchCollection.duration = pitchCollection.duration - generalRestPitchColl.duration 
-           
-        
-        ''' set section endTimes '''
-        explainedPitchCollectionList= self.setSectionEndTimes(explainedPitchCollectionList) 
-        
-        self.pitchCollSequence = PitchCollectionSequence(self.scoreTree, explainedPitchCollectionList)
-        # logging.info ('Number of pitch collections: ' + str(len(explainedPitchCollectionList)) + ' current explanation ratio: ' + str(self.pitchCollSequence.explanationRatioList[-1]) +  ' current incoherence ratio: ' + str(self.pitchCollSequence.incoherenceRatioList[-1])) 
-        
-        self.pitchCollectionSequenceList.append(self.pitchCollSequence)
-        
-        
-        
-    
-    def getSectionEndTimes (self, sectionEndMarkers = ["final", "double", "fermata"]):
-        '''this always takes into account the element's endTime: i.e. offset + duration in quarter length'''
-        
-        offsetList = [] 
-         
-        if "final" in sectionEndMarkers or "double" in sectionEndMarkers or "repeat" in sectionEndMarkers:
-            for measure in self.stream.semiFlat.getElementsByClass(stream.Measure):
-                if measure.rightBarline == None : continue
-                if measure.rightBarline.type in  ["final", "double"]: 
-                    highestTime = measure.duration.quarterLength + measure.offset
-                    if highestTime not in offsetList: 
-                        offsetList.append(highestTime)
-            
-        if "fermata" in sectionEndMarkers:
-            for noteElement in self.stream.flat.recurse().getElementsByClass (note.Note):
-                for elementExpression in noteElement.expressions:
-                    if elementExpression.name == "fermata":
-                        endTime = noteElement.offset + noteElement.duration.quarterLength
-            
-                        if endTime not in offsetList: offsetList.append(noteElement.offset) 
-             
-        return offsetList   
-    
-    def setSectionEndTimes (self, pitchCollList):
-        ''' identify structural elements i.e.  fermata, a double bar, a final bar etc. endtimes  '''
-        self.endTimeList = self.getSectionEndTimes()
-        
-        for pitchColl in pitchCollList:
-            if pitchColl.endTime in self.endTimeList:
-                pitchColl.isSectionEnd = True
-                
-        return pitchCollList
-        
-    
-    def getHighesOffsetInMeasure(self, mes, classFilter = [note.Note, note.Rest, chord.Chord]):
-        if hasattr(mes, "highestNoteOffset"):
-            if mes.highestNoteOffset > 0: return mes.highestNoteOffset
-        
-        ''' the getHighestOffset function in streams takes every element into account ''' 
-        ''' This has a filter function ''' 
-        highestOffset = 0
-        for noteElement in mes.getElementsByClass(classFilter):
-            if noteElement.offset > highestOffset: highestOffset = noteElement.offset
-            
-        mes.highestNoteOffset = highestOffset
-        
-        return highestOffset
-            
-        
-    
-    
-    
-    def getGeneralRestNextEvent (self, vert):
-        ''' checks if next event is a general rest and returns empty pitch coll if so  ''' 
-        
-        if vert.nextVerticality == None: return None
-        nextVert = vert.nextVerticality
-        nextVertOverlapTS = nextVert.overlapTimespans
-        nextVertStopTS = nextVert.stopTimespans
-        
-        if len (nextVertOverlapTS) == 0 and len (nextVertStopTS) == 0:
-            highestEndtime = 0
-            
-            ''' get highest offset of starts and overlaps '''
-            for ts in vert.startAndOverlapTimespans:
-                if ts.endTime > highestEndtime: highestEndtime = ts.endTime
-                
-            generalRestDuration = nextVert.offset - highestEndtime
-            generalRestOffset = highestEndtime
-            
-            
-       
-            return PitchCollection(None, [], generalRestDuration, generalRestOffset)
-            
-        
-        else:
-            return None
-        
-        ''' if next vert has no stop and no overlaps, the event between current verticality and next one is a general silence '''
-         
-        
-        
-        
-        
-        
-        
-    
-    def createPitchCollection (self, verticality):
-        
-        analyzedPitchList = []
-        verticalities = VerticalitySequence([None, verticality, None])
-        
-        
-        ''' check if verticality is consonant '''
-        #=======================================================================
-        # element = verticality.makeElement()
-        # 
-        # if isinstance(element, chord.Chord) :
-        #     if element.isConsonant(): isConsonant = True
-        #     
-        # if isinstance (element, note.Note): isConsonant = True
-        #=======================================================================
-        
-        ''' extract all pitches (not only pitch sets but also every instance of same pitch) '''
-        ''' 1. get everything in start and overlap timespans '''
-        elementList = []
-        for element in verticality.startTimespans:
-            elementList.append(element)
-        
-        for element in verticality.overlapTimespans:
-            
-            if round (element.endTime, 6) == round (verticality.offset, 6):continue
-            elementList.append(element)
-        
-        ''' 2. loop over these elements  '''
-        for element in elementList:
-            ''' 2.1. extract part '''
-            elementPart = element.getParentageByClass(classList=(stream.Part,))
-            
-            ''' 2.2. extract voice '''
-            elementVoice = element.getParentageByClass(classList=(stream.Voice,))
-            
-            ''' 2.3a if element is note '''
-            if isinstance(element.element, note.Note):
-                ''' get id for this specific note '''
-                elementId = element.element.id 
-                ''' create analyzed pitch, add information append to pitchList'''
-                analyzedPitch = Pitch(element.element.pitch, verticalities)
-                analyzedPitch.id = elementId
-                analyzedPitch.part = elementPart
-                analyzedPitch.voice = elementVoice
-                analyzedPitch.attack = True if element in verticality.startTimespans else False
-                analyzedPitchList.append(analyzedPitch)
-                
-                 
-                
-                
-                if verticality.nextVerticality != None:
-                    analyzedPitch.segmentQuarterLength = verticality.nextVerticality.offset - verticality.offset
-                else:
-                    analyzedPitch.segmentQuarterLength = verticality.startTimespans[0].quarterLength
-                
-            if isinstance(element.element, chord.Chord):
-                
-                ''' loop over every note in chord and create analyzed pitch '''
-                for chordNote in element.element._notes:
-                    analyzedPitch = Pitch(chordNote.pitch, verticalities)
-                    analyzedPitch.id = chordNote.id
-                    analyzedPitch.part = elementPart
-                    analyzedPitch.voice = elementVoice
-                    analyzedPitch.attack = True if element in verticality.startTimespans else False
-                    analyzedPitchList.append(analyzedPitch)
-            
-            
-             
-                    
-        
-        
-        
-        return PitchCollection(verticality, analyzedPitchList)
-    
-    def getAnalyzedPitches (self, sequence=0):
-        
-        ''' get all analyzed pitches in pitchCollSequence '''
-        return self.pitchCollectionSequenceList[sequence].getAnalyzedPitches()
-    
-    def getElementsContainingPitch (self, nhVerticality, pitch): 
-        elementList = []
-        allElements = []
-        
-        for element in nhVerticality.startTimespans:
-            allElements.append(element.element)
-            
-        for element in nhVerticality.overlapTimespans:
-            allElements.append(element.element)
-        
-        for element in allElements:
-            if isinstance(element, note.Note):
-                if element.pitch.nameWithOctave == pitch.nameWithOctave:
-                    elementList.append(element)
-            if isinstance(element, chord.Chord):
-                if pitch in element.pitches:
-                    elementList.append(element)
-        return elementList
-    
-    def getPitchIdOfReferenceElement (self, verticality, pitch):
-        elementList = self.getElementsContainingPitch (verticality, pitch)
-        elementReferenceIdList = []
-        
-        for element in elementList:
-            if isinstance(element, note.Note):
-                elementReferenceIdList.append(element.pitch.id)
-        
-        return elementReferenceIdList
-    
-    def getPitchCollectionSequence(self, xmlString=False):
-    
-        if len (self.pitchCollectionSequenceList) == 0: 
-            if xmlString == False:
-                return self.pitchCollSequence
-            else:
-                return self.pitchCollSequence.getXML()
-        else : 
-            # logging.INFO('MORE THAN ONE POSSIBLE SCORE... Retrieving only first possibility')
-            if xmlString == False:
-            
-                return self.pitchCollectionSequenceList[0] 
-            else: return self.pitchCollectionSequenceList[0].setXML()
-    
-    def getXMLRepresentation (self):
-        xmlRepresentation = self.pitchCollectionSequenceList[0].getXMLRepresentation()
-        
-        return xmlRepresentation
-    
-    def getAnnotatedStream(self):
-        scoreList = []
-        
-        ''' remove all lyrics '''
-        for verticality in  self.scoreTree.iterateVerticalities():
-            for element in verticality.startTimespans:
-                if isinstance(element.element, note.Note) or isinstance(element.element, chord.Chord):
-                    element.element.lyric = None
-        
-        ''' loop through nhn collection list '''
-        
-        possibleScores = []
-        if len (self.pitchCollectionSequenceList) == 0 :
-            possibleScores = [self.pitchCollSequence]
-        
-        else: possibleScores = self.pitchCollectionSequenceList
-        
-        for possibleScore in possibleScores:
-            
-            ''' remove all lyrics '''
-            for verticality in  self.scoreTree.iterateVerticalities():
-                for element in verticality.startTimespans:
-                    if isinstance(element.element, note.Note) or isinstance(element.element, chord.Chord):
-                        element.element.lyric = None
-        
-            for explainedPitchCollection in possibleScore.explainedPitchCollectionList: 
-                verticality = explainedPitchCollection.verticality
-                
-                for analyzedPitch in explainedPitchCollection.analyzedPitchList:
-                    elementList = possibleScore.getElementsContainingPitch(verticality, analyzedPitch.pitch)
-                    
-                    for element in elementList:
-                        pitchType = str(analyzedPitch.pitchType)
-                        if analyzedPitch.probability < 1: pitchType = pitchType + " (?)" 
-                    
-                        if element.lyric == None:
-                                element.lyric = pitchType
-                        elif pitchType in element.lyric:
-                            pass
-                        
-                        else:   
-                            element.lyric = str (element.lyric) + pitchType
-        
-            scoreList.append (tree.toStream.partwise(self.scoreTree, templateStream=self.stream))
-            
-        # if len (scoreList)> 1: logging.info(str (len(scoreList)) + ' POSSIBLE SCORES... Retrieving only first item')
-        
-        return scoreList
-    
-    def setPitchCollectionSequence(self, xmlString):
-        ''' loads xmlData into pitch coll sequence '''
-        
-        self.pitchCollectionSequenceList[0].loadXMLAnalysis(xmlString)
-        
-        
-    def setRootsFromStream(self, rootStream):
-        for pitchCollSequence in self.pitchCollectionSequenceList:
-            pitchCollSequence.setRootsFromStream(rootStream)
-         
     
 class PitchCollectionSequence (object):
     
-    def __init__(self, scoreTree, pitchCollectionList):
+    def __init__(self, work=None):
+        self.work = work 
         self.id = id(self)
-        self.scoreTree = scoreTree
-        self.explainedPitchCollectionList = pitchCollectionList
-        self.explanationRatioList = []
-        self.incoherenceRatioList = []
-        self.probabilityRatioList = []
+        self.endTimeList = []
         self.duration = None
         self.totalPitches = 0
-        self.idDictionary = {}  # ## maps note or chord id to analyzedPitches (one note or chord can have several analytical interpretations according to offset) 
-        self.callId = None
-        self.rootMap = []  # stores data about roots from a start offset to an end offset
+        #self.idDictionary = {}  # ## maps note or chord id to analyzedPitches (one note or chord can have several analytical interpretations according to offset) 
         self.name = None 
-        self.exploredHypothesisList = []  # a list of pitch hypotheses already explored
         self.finalisRoot = None
-    
-    def getDissonancesAtOffset (self, offset):
-        ''' returns identified dissonances starting before current offset and resolving after this offset '''
-        analyzedDissonancesList = []
         
-        for pitchCollection in self.explainedPitchCollectionList:
-            
-            ''' break if collection offset > as current offset ''' 
-            if pitchCollection.verticality.offset > offset:
-                break
-            
-            ''' check if collection has dissonances resolving after current offset '''
-            if pitchCollection.getHighestResolutionOffest() > offset:
-                
-                for analyzedPitch in pitchCollection.getExplainedPitches(['PN', 'NN', 'AN', 'EN', 'SU']):
-                    if analyzedPitch.resolutionOffset != None:
-                        analyzedDissonancesList.append(analyzedPitch)
-        return analyzedDissonancesList 
+        
     
-#     def setRootDegreeFromReferencePitch (self, referencePitch):
-#         
-#         stepDictionary = {}
-#         
-#         ''' associate final chord to I and and create dictionary of all other scale steps'''
-#         
-#         if isinstance(referencePitch, str):
-#             rootPitch = pitch.Pitch(referencePitch)
-#         
-#         referenceStep = rootPitch.step
-#         
-#         diatonicSteps = ["A", "B", "C", "D", "E", "F", "G"]
-#         referenceIndex = None
-#         
-#         for counter, diatonicStep in enumerate(diatonicSteps):
-#             if diatonicStep == referenceStep: referenceIndex = counter
-#                 
-#         stepDictionary[diatonicSteps [referenceIndex]] = "I" 
-#         stepDictionary[ diatonicSteps [(referenceIndex + 1) % 7]] = "II"
-#         stepDictionary [diatonicSteps [(referenceIndex + 2) % 7]] = "III"
-#         stepDictionary [diatonicSteps [(referenceIndex + 3) % 7]] = "IV"
-#         stepDictionary [diatonicSteps [(referenceIndex + 4) % 7]] = "V"
-#         stepDictionary [diatonicSteps [(referenceIndex + 5) % 7]] = "VI"
-#         stepDictionary [diatonicSteps [(referenceIndex + 6) % 7]] = "VII"
-#        
-#         
-#          
-#         ''' given a root, this deduces the roman numeral from a given finalis Root '''
-#         for pitchColl in self.explainedPitchCollectionList:
-#             if pitchColl.rootPitch != None:
-#                 pitchColl.romanNumeral = stepDictionary[pitchColl.rootPitch.step]
+        
+      
+        
+        
+        ''' Create AnalyzedPitchCollectionSequence  '''
+        self.explainedPitchCollectionList = []
+        
+        
+        if work != None:
+            logging.info ('Creating pitch collections...')  
+            
+            ''' correct symbolic measure numbers '''
+            self.correctSymbolicMeasureNumbers()
+            
+            self.stream = work
+            self.semiFlatStream = self.stream.semiFlat
+            self.scoreTree = tree.fromStream.asTimespans(self.stream, flatten=True, classList=(note.Note, chord.Chord))
+            self.measureOffsetList = self.getMeasureOffsets()
+            
+            
+            
+           
+            for verticality in self.scoreTree.iterateVerticalities():
+                print (round(verticality.offset/work.duration.quarterLength,2))
                 
-    def getDiatonicDegreesDictionary(self):
-        self.diatonicDegreesDictionary = {}
+                ''' check if next event is not general break  '''
+                generalRestPitchColl = self.getGeneralRestNextEvent(verticality) 
+                
+                ''' create pitch collection '''
+                pitchCollection = self.createPitchCollection (verticality)
+                self.explainedPitchCollectionList.append(pitchCollection)
+                
+                ''' adjust offset and duration if general rest exists '''
+                if generalRestPitchColl != None:
+                    self.explainedPitchCollectionList.append(generalRestPitchColl)
+                    pitchCollection.duration = pitchCollection.duration - generalRestPitchColl.duration 
+                    
+                ''' add relative offsets (i.e. offsets within a measure) '''
+                    
+                pitchCollection.relativeOffset = self.getRelativeOffset(verticality)
+           
+        
+        ''' set section endTimes '''
+        self.explainedPitchCollectionList= self.setSectionStartAndEndTimes(self.explainedPitchCollectionList) 
+        self.analyzedPitches = self.getAnalyzedPitches()
+      
+    def addAnalyzedPitch(self, analyzedPitch):
+        self.analyzedPitches.append(analyzedPitch)
+        pitchColl = self.getAnalyzedPitchCollectionAtOffset(analyzedPitch.offset)
+        pitchColl.analyzedPitchList.append(analyzedPitch)
+        
+        
+    def updatePitchCollSequence(self):
+        ''' this is used to update general information about sequence (duration, total pitches, ) '''
+        self.duration = 0
         
         for pitchColl in self.explainedPitchCollectionList:
-            if not pitchColl.bassDiatonicDegree in self.diatonicDegreesDictionary: self.diatonicDegreesDictionary[pitchColl.bassDiatonicDegree] = {
-                "name": pitchColl.bassDiatonicDegree,
-                "pitchCollections": [],
-                "harmonizations": {},
-                "duration": 0
-                } 
-            
-            diatonicDegreeDictionaryEntry = self.diatonicDegreesDictionary[pitchColl.bassDiatonicDegree]
-            
-            diatonicDegreeDictionaryEntry["pitchCollections"].append(pitchColl)
-            diatonicDegreeDictionaryEntry["duration"] = diatonicDegreeDictionaryEntry["duration"] +  pitchColl.duration
-            
-            continuoSigns = pitchColl.getSimpleFilteredContinuoSigns()
-            if continuoSigns == "": continuoSigns = "[None]"
-            
-            harmonizationDictionary = diatonicDegreeDictionaryEntry["harmonizations"]
-            
-            if not continuoSigns in harmonizationDictionary:
-                harmonizationDictionary[continuoSigns] = {
-                    "name": continuoSigns,
-                    "pitchCollections": [],
-                    "duration": 0
-                    }
-            harmonization = diatonicDegreeDictionaryEntry["harmonizations"][continuoSigns]
-            harmonization["duration"] = harmonization["duration"] + pitchColl.duration
-            harmonization["pitchCollections"].append (pitchColl)
-                
-        return self.diatonicDegreesDictionary
-                
-    
-    
-    
-    def setRealBassDiatonicDegree (self, scale):
-        stepDictionary = {}
+            self.duration = self.duration + pitchColl.duration
         
-        diatonicSteps = [scalePitch.name for scalePitch in scale.pitches]
+        self.totalPitches = len (self.analyzedPitches)
         
-        for stepCounter, diatonicStep in enumerate(diatonicSteps):
-            if diatonicStep in stepDictionary: continue
-            
-            stepDictionary[diatonicStep ] = str(stepCounter + 1)
-            
-            dimU = interval.Interval("d1")
-            augU = interval.Interval("a1")
-            
-            dimU.noteStart = note.Note(diatonicStep)
-            augU.noteStart = note.Note(diatonicStep)
         
-            flatDegree = dimU.noteEnd 
-            sharpDegree = augU.noteEnd
-            
-            stepDictionary[flatDegree.name] = str(stepCounter + 1)+"-"
-            stepDictionary[sharpDegree.name] = str(stepCounter + 1)+"#"
-            
+        ''' sort pitch coll list according to offsets '''
+        self.explainedPitchCollectionList.sort(key=lambda pitchColl: pitchColl.offset)
+        
+        
+        
+    def getRealBassPatterns(self):
+        realBassList = []
+        
         for pitchColl in self.explainedPitchCollectionList:
-            realBassPitch = pitch.Pitch(pitchColl.bass) 
+            degree = pitchColl.bassScaleDegree + "^" + pitchColl.getSimpleFilteredContinuoSigns()
             
-            if realBassPitch.name in stepDictionary:
-                pitchColl.bassDiatonicDegree = stepDictionary[realBassPitch.name]
-            else: 
-                pitchColl.bassDiatonicDegree = "?"
-                    
+            if pitchColl.isSectionStart: 
+                degree = "*" + degree
+            if pitchColl.isSectionEnd : 
+                degree = degree + "|"   
+                  
+            if len (realBassList) > 0 :
+                if degree == realBassList[-1] + "|":  
+                    realBassList[-1] = realBassList[-1]+ "|"
+                    continue
+                
+                elif "*" + degree == realBassList[-1]:
+                    continue
+                
+                elif degree == realBassList[-1]:
+                    continue
                 
             
-            
-            
-            
-            
-            
-                           
-                
-                    
+            realBassList.append(degree)
+        
+        return realBassList
     
+    def getRealBassSubPatterns (self, bassPatterns, minLength = 3, maxLength = 10):
+        patternList = []
     
-    def setRealbassScaleDegreeFromReferencePitch (self, scale, referencePitch):  
-        
-        stepDictionary = {}
-        
-        ''' adds root degree e.g. romann numerals, given scale  and a reference pitch, '''
-        
-        if isinstance(referencePitch, str):
-            rootPitch = pitch.Pitch(referencePitch)
-        
-        referenceStep = rootPitch
-        
-        diatonicSteps = [scalePitch.name for scalePitch in scale.pitches]
-        referenceIndex = None
-        
-        for counter, diatonicStep in enumerate(diatonicSteps):
-            if diatonicStep == referenceStep.name: referenceIndex = counter
-                
-        stepDictionary[diatonicSteps [referenceIndex]] = "1" 
-        stepDictionary[ diatonicSteps [(referenceIndex + 1) % 7]] = "2"
-        stepDictionary [diatonicSteps [(referenceIndex + 2) % 7]] = "3"
-        stepDictionary [diatonicSteps [(referenceIndex + 3) % 7]] = "4"
-        stepDictionary [diatonicSteps [(referenceIndex + 4) % 7]] = "5"
-        stepDictionary [diatonicSteps [(referenceIndex + 5) % 7]] = "6"
-        stepDictionary [diatonicSteps [(referenceIndex + 6) % 7]] = "7"
-        
-        ''' add chromatic steps ''' 
-        chomaticDictionary = {}
-        alterationDictionary ={}
-        
-        for diatonicStepKey, diatonicStep in  stepDictionary.items():
-            dimU = interval.Interval("d1")
-            augU = interval.Interval("a1")
+        for x, y in combinations(range(len(bassPatterns) + 1), r = 2):
+            subList = bassPatterns[x:y] 
             
-            dimU.noteStart = note.Note(diatonicStepKey)
-            augU.noteStart = note.Note(diatonicStepKey)
+            if len (subList) < minLength: continue
+            if len (subList) > maxLength: continue
+            
+            hasInterruption = False
+            for degree in subList[0:len(subList)-1]: 
+                if "|" in degree : 
+                    hasInterruption = True
+                    break 
+            
+            if subList not in patternList and hasInterruption== False: 
+                patternList.append(subList)
+                
+        return patternList
+    
+    def getSubPatternOccurrences (self):
+        subPatternOccurrenceList = []
         
-            flatDegree = dimU.noteEnd 
-            sharpDegree = augU.noteEnd
-            
-            chomaticDictionary[flatDegree.name] = diatonicStep + "-"
-            chomaticDictionary[sharpDegree.name] = diatonicStep + "#"
-            
-            alterationDictionary[flatDegree.name] =  "-"
-            alterationDictionary[sharpDegree.name] = "#"
-            
-            
-            
-        ''' add items to step dict ''' 
-        for degreeKey, degree in  chomaticDictionary.items():
-            stepDictionary[degreeKey]= degree 
+        bassPatterns = self.getRealBassPatterns()
+        bassPatternStr = str(bassPatterns)
         
-         
-        ''' set scale degree numbers accordingly in dic '''
-        for pitchColl in self.explainedPitchCollectionList:
-            
-            realBassPitch = pitch.Pitch(pitchColl.bass) 
-            if realBassPitch.name in stepDictionary: 
-                pitchColl.bassScaleDegree = stepDictionary[realBassPitch.name]
+        bassSubPatternList = self.getRealBassSubPatterns(bassPatterns)
         
-                
-            ''' loop over intervals '''
-            for pitchCollInt in pitchColl.intervalsToBass:
-                genericSimpleName = str(pitchCollInt.generic.simpleUndirected)
-                pitchColl.simpleContinuoSigns.append(genericSimpleName)
-                
-                 
-                
-                endNote=  pitchCollInt.noteEnd
-                
-                ''' if  end note is not diatonic step, add alteration or ?  '''
-                if endNote.name in diatonicSteps: 
-                    pass
-                elif endNote.name in alterationDictionary:
-                    genericSimpleName = str(genericSimpleName) + alterationDictionary[endNote.name]
-                else: 
-                    genericSimpleName = str(genericSimpleName) + "?"
-                
-                if genericSimpleName not in pitchColl.continuoSigns:
-                    pitchColl.continuoSigns.append(genericSimpleName)
-                    
-            pitchColl.continuoSigns.sort()
-                
-                
-                     
-                
+        for bassSubPattern in bassSubPatternList:
+        
+            subPatternOccurrenceList.append ([bassPatternStr.count(str(bassSubPattern)[1:-1]), bassSubPattern])
+            
+        subPatternOccurrenceList.sort(key=lambda x: x[0], reverse=True)
+        
+        return subPatternOccurrenceList
+        
+        
+    
     def analyzeRealBassMovements (self):
         '''  used to retrieve scale degree successions with figured bass '''
         self.continuoSuccessionDict = {} 
@@ -688,35 +282,318 @@ class PitchCollectionSequence (object):
  
             
             pitchCollCounter = pitchCollCounter + 1 
+    
+    
+    def createPitchCollection (self, verticality):
+         
+        analyzedPitchList = []
+        verticalities = VerticalitySequence([None, verticality, None])
+         
+         
+        ''' check if verticality is consonant '''
+        #=======================================================================
+        # element = verticality.makeElement()
+        # 
+        # if isinstance(element, chord.Chord) :
+        #     if element.isConsonant(): isConsonant = True
+        #     
+        # if isinstance (element, note.Note): isConsonant = True
+        #=======================================================================
+         
+        ''' extract all pitches (not only pitch sets but also every instance of same pitch) '''
+        ''' 1. get everything in start and overlap timespans '''
+        elementList = []
+        for element in verticality.startTimespans:
+            elementList.append(element)
+         
+        for element in verticality.overlapTimespans:
+             
+            if round (element.endTime, 6) == round (verticality.offset, 6):continue
+            elementList.append(element)
+         
+        ''' 2. loop over these elements  '''
+        for element in elementList:
+            ''' 2.1. extract part '''
+            elementPart = element.getParentageByClass(classList=(stream.Part,))
+             
+            ''' 2.2. extract voice '''
+            elementVoice = element.getParentageByClass(classList=(stream.Voice,))
+             
+            ''' 2.3a if element is note '''
+            if isinstance(element.element, note.Note):
+                ''' get id for this specific note '''
+                elementId = element.element.id 
+                ''' create analyzed pitch, add information append to pitchList'''
+                analyzedPitch = Pitch(element.element.pitch, verticalities)
+                analyzedPitch.id = elementId
+                analyzedPitch.part = elementPart
+                analyzedPitch.voice = elementVoice
+                analyzedPitch.attack = True if element in verticality.startTimespans else False
+                analyzedPitchList.append(analyzedPitch)
+                 
+                  
+                 
+                 
+                if verticality.nextVerticality != None:
+                    analyzedPitch.segmentQuarterLength = verticality.nextVerticality.offset - verticality.offset
+                else:
+                    analyzedPitch.segmentQuarterLength = verticality.startTimespans[0].quarterLength
+                 
+            if isinstance(element.element, chord.Chord):
+                 
+                ''' loop over every note in chord and create analyzed pitch '''
+                for chordNote in element.element._notes:
+                    analyzedPitch = Pitch(chordNote.pitch, verticalities)
+                    analyzedPitch.id = chordNote.id
+                    analyzedPitch.part = elementPart
+                    analyzedPitch.voice = elementVoice
+                    analyzedPitch.attack = True if element in verticality.startTimespans else False
+                    analyzedPitchList.append(analyzedPitch) 
+        return PitchCollection(verticality, analyzedPitchList)
+    
+
+    
+#     def setRootDegreeFromReferencePitch (self, referencePitch):
+#         
+#         stepDictionary = {}
+#         
+#         ''' associate final chord to I and and create dictionary of all other scale steps'''
+#         
+#         if isinstance(referencePitch, str):
+#             rootPitch = pitch.Pitch(referencePitch)
+#         
+#         referenceStep = rootPitch.step
+#         
+#         diatonicSteps = ["A", "B", "C", "D", "E", "F", "G"]
+#         referenceIndex = None
+#         
+#         for counter, diatonicStep in enumerate(diatonicSteps):
+#             if diatonicStep == referenceStep: referenceIndex = counter
+#                 
+#         stepDictionary[diatonicSteps [referenceIndex]] = "I" 
+#         stepDictionary[ diatonicSteps [(referenceIndex + 1) % 7]] = "II"
+#         stepDictionary [diatonicSteps [(referenceIndex + 2) % 7]] = "III"
+#         stepDictionary [diatonicSteps [(referenceIndex + 3) % 7]] = "IV"
+#         stepDictionary [diatonicSteps [(referenceIndex + 4) % 7]] = "V"
+#         stepDictionary [diatonicSteps [(referenceIndex + 5) % 7]] = "VI"
+#         stepDictionary [diatonicSteps [(referenceIndex + 6) % 7]] = "VII"
+#        
+#         
+#          
+#         ''' given a root, this deduces the roman numeral from a given finalis Root '''
+#         for pitchColl in self.explainedPitchCollectionList:
+#             if pitchColl.rootPitch != None:
+#                 pitchColl.romanNumeral = stepDictionary[pitchColl.rootPitch.step]
+                
+    def getDiatonicDegreesDictionary(self):
+        ''' returns a dictionary with scale degrees and the occurrences '''
+        ''' SCALE DEGREES ARE NOT COMPUTED IN RELATION TO THE FINAL BUT TO THE UNTERLYING SCALE '''
         
         
-   
+        self.diatonicDegreesDictionary = {}
+        
+        for pitchColl in self.explainedPitchCollectionList:
+            if not pitchColl.bassDiatonicDegree in self.diatonicDegreesDictionary: self.diatonicDegreesDictionary[pitchColl.bassDiatonicDegree] = {
+                "name": pitchColl.bassDiatonicDegree,
+                "pitchCollections": [],
+                "harmonizations": {},
+                "duration": 0
+                } 
+            
+            diatonicDegreeDictionaryEntry = self.diatonicDegreesDictionary[pitchColl.bassDiatonicDegree]
+            
+            diatonicDegreeDictionaryEntry["pitchCollections"].append(pitchColl)
+            diatonicDegreeDictionaryEntry["duration"] = diatonicDegreeDictionaryEntry["duration"] +  pitchColl.duration
+            
+            continuoSigns = pitchColl.getSimpleFilteredContinuoSigns()
+            if continuoSigns == "": continuoSigns = "[None]"
+            
+            harmonizationDictionary = diatonicDegreeDictionaryEntry["harmonizations"]
+            
+            if not continuoSigns in harmonizationDictionary:
+                harmonizationDictionary[continuoSigns] = {
+                    "name": continuoSigns,
+                    "pitchCollections": [],
+                    "duration": 0
+                    }
+            harmonization = diatonicDegreeDictionaryEntry["harmonizations"][continuoSigns]
+            harmonization["duration"] = harmonization["duration"] + pitchColl.duration
+            harmonization["pitchCollections"].append (pitchColl)
+                
+        return self.diatonicDegreesDictionary
+    
+    def getDissonancesAtOffset (self, offset):
+        ''' returns identified dissonances starting before current offset and resolving after this offset '''
+        analyzedDissonancesList = []
+        
+        for pitchCollection in self.explainedPitchCollectionList:
+            
+            ''' break if collection offset > as current offset ''' 
+            if pitchCollection.verticality.offset > offset:
+                break
+            
+            ''' check if collection has dissonances resolving after current offset '''
+            if pitchCollection.getHighestResolutionOffest() > offset:
+                
+                for analyzedPitch in pitchCollection.getExplainedPitches(['PN', 'NN', 'AN', 'EN', 'SU']):
+                    if analyzedPitch.resolutionOffset != None:
+                        analyzedDissonancesList.append(analyzedPitch)
+        return analyzedDissonancesList  
+    
+    def setRealBassDiatonicDegree (self, scale):
+        stepDictionary = {}
+        
+        diatonicSteps = [scalePitch.name for scalePitch in scale.pitches]
+        
+        for stepCounter, diatonicStep in enumerate(diatonicSteps):
+            if diatonicStep in stepDictionary: continue
+            
+            stepDictionary[diatonicStep ] = str(stepCounter + 1)
+            
+            dimU = interval.Interval("d1")
+            augU = interval.Interval("a1")
+            
+            dimU.noteStart = note.Note(diatonicStep)
+            augU.noteStart = note.Note(diatonicStep)
+        
+            flatDegree = dimU.noteEnd 
+            sharpDegree = augU.noteEnd
+            
+            stepDictionary[flatDegree.name] = str(stepCounter + 1)+"-"
+            stepDictionary[sharpDegree.name] = str(stepCounter + 1)+"#"
+            
+        for pitchColl in self.explainedPitchCollectionList:
+            realBassPitch = pitch.Pitch(pitchColl.bass) 
+            
+            if realBassPitch.name in stepDictionary:
+                pitchColl.bassDiatonicDegree = stepDictionary[realBassPitch.name]
+            else: 
+                pitchColl.bassDiatonicDegree = "?" 
+                
+                    
+    
+    
+    def setRealbassScaleDegreeFromReferencePitch (self, scale, referencePitch):  
         
         
+        ''' given a reference pitch (final) and a scale, add information about scale degrees and continuo signs to pitch colls '''
+        
+        stepDictionary = {}
+        
+        if isinstance(referencePitch, str):
+            rootPitch = pitch.Pitch(referencePitch)
+        
+        referenceStep = rootPitch
+        
+        diatonicSteps = [scalePitch.name for scalePitch in scale.pitches]
+        referenceIndex = None
+        
+        for counter, diatonicStep in enumerate(diatonicSteps):
+            if diatonicStep == referenceStep.name: referenceIndex = counter
+                
+        stepDictionary[diatonicSteps [referenceIndex]] = "1" 
+        stepDictionary[ diatonicSteps [(referenceIndex + 1) % 7]] = "2"
+        stepDictionary [diatonicSteps [(referenceIndex + 2) % 7]] = "3"
+        stepDictionary [diatonicSteps [(referenceIndex + 3) % 7]] = "4"
+        stepDictionary [diatonicSteps [(referenceIndex + 4) % 7]] = "5"
+        stepDictionary [diatonicSteps [(referenceIndex + 5) % 7]] = "6"
+        stepDictionary [diatonicSteps [(referenceIndex + 6) % 7]] = "7"
+        
+        ''' add chromatic steps ''' 
+        chomaticDictionary = {}
+        alterationDictionary ={}
+        
+        for diatonicStepKey, diatonicStep in  stepDictionary.items():
+            dimU = interval.Interval("d1")
+            augU = interval.Interval("a1")
+            
+            dimU.noteStart = note.Note(diatonicStepKey)
+            augU.noteStart = note.Note(diatonicStepKey)
+        
+            flatDegree = dimU.noteEnd 
+            sharpDegree = augU.noteEnd
+            
+            chomaticDictionary[flatDegree.name] = diatonicStep + "-"
+            chomaticDictionary[sharpDegree.name] = diatonicStep + "#"
+            
+            alterationDictionary[flatDegree.name] =  "-"
+            alterationDictionary[sharpDegree.name] = "#"
+            
+            
+            
+        ''' add items to step dict ''' 
+        for degreeKey, degree in  chomaticDictionary.items():
+            stepDictionary[degreeKey]= degree 
+        
+         
+        ''' set real bass degrees accordingly to dic '''
+        for pitchColl in self.explainedPitchCollectionList:
+            
+            realBassPitch = pitch.Pitch(pitchColl.bass) 
+            if realBassPitch.name in stepDictionary: 
+                pitchColl.bassScaleDegree = stepDictionary[realBassPitch.name]
+        
+                
+            ''' loop over intervals '''
+            for pitchCollInt in pitchColl.intervalsToBass:
+                genericSimpleName = str(pitchCollInt.generic.simpleUndirected)
+                pitchColl.simpleContinuoSigns.append(genericSimpleName)
+                
+                 
+                
+                endNote=  pitchCollInt.noteEnd
+                
+                ''' if  end note is not diatonic step, add alteration or ?  '''
+                if endNote.name in diatonicSteps: 
+                    pass
+                elif endNote.name in alterationDictionary:
+                    genericSimpleName = str(genericSimpleName) + alterationDictionary[endNote.name]
+                else: 
+                    genericSimpleName = str(genericSimpleName) + "?"
+                
+                if genericSimpleName not in pitchColl.continuoSigns:
+                    pitchColl.continuoSigns.append(genericSimpleName)
+                    
+            pitchColl.continuoSigns.sort()
+                
+                
+                    
          
          
         
     
-    def getContinuoDictionary (self, dictionaryType = "simple"):
-        continuoDictionary = {}
+    def getContinuoDictionary (self):
+        self.continuoDictionary = {}
         
         for pitchColl in self.explainedPitchCollectionList:
             
+            if not pitchColl.bassScaleDegree in self.continuoDictionary: self.continuoDictionary[pitchColl.bassScaleDegree] = {
+                "name": pitchColl.bassScaleDegree,
+                "pitchCollections": [],
+                "harmonizations": {},
+                "duration": 0
+                }
             
-            if dictionaryType == "simple":
-                continuoNotation = pitchColl.bassScaleDegree + "_" + pitchColl.getSimpleFilteredContinuoSigns()
+            self.continuoDictionary[pitchColl.bassScaleDegree]["pitchCollections"].append(pitchColl) 
+            self.continuoDictionary[pitchColl.bassScaleDegree]["duration"] = self.continuoDictionary[pitchColl.bassScaleDegree]["duration"] + pitchColl.duration
+            
+            continuoSigns = pitchColl.getSimpleFilteredContinuoSigns()
+            if continuoSigns == "": continuoSigns = "[None]"
             
             
-            else:
             
-                continuoNotation = pitchColl.bassScaleDegree+str(pitchColl.continuoSigns)
-            
-            if continuoNotation not in continuoDictionary:
-                continuoDictionary[continuoNotation] = pitchColl.duration
-            else:
-                continuoDictionary[continuoNotation] =continuoDictionary[continuoNotation] + pitchColl.duration
+            if not continuoSigns in self.continuoDictionary[pitchColl.bassScaleDegree]["harmonizations"]:
+                self.continuoDictionary[pitchColl.bassScaleDegree]["harmonizations"][continuoSigns] = {
+                    "name": continuoSigns,
+                    "pitchCollections": [],
+                    "duration": 0
+                    }
+            harmonization = self.continuoDictionary[pitchColl.bassScaleDegree]["harmonizations"][continuoSigns]
+            harmonization["duration"] = harmonization["duration"] + pitchColl.duration
+            harmonization["pitchCollections"].append (pitchColl)
+             
                 
-        return continuoDictionary
+        return self.continuoDictionary
             
             
         
@@ -777,7 +654,7 @@ class PitchCollectionSequence (object):
     
     def getAnalyzedPitchCollectionAtOffset (self, offset):
         for explainedPitchCollection in self.explainedPitchCollectionList:
-            if explainedPitchCollection.verticality.offset == offset:
+            if explainedPitchCollection.offset == offset:
                 return explainedPitchCollection 
             
         return None
@@ -845,6 +722,36 @@ class PitchCollectionSequence (object):
         
         return None
     
+    def getGeneralRestNextEvent (self, vert):
+        ''' checks if next event is a general rest and returns empty pitch coll if so  ''' 
+         
+        if vert.nextVerticality == None: return None
+        nextVert = vert.nextVerticality
+        nextVertOverlapTS = nextVert.overlapTimespans
+        nextVertStopTS = nextVert.stopTimespans
+         
+        if len (nextVertOverlapTS) == 0 and len (nextVertStopTS) == 0:
+            highestEndtime = 0
+             
+            ''' get highest offset of starts and overlaps '''
+            for ts in vert.startAndOverlapTimespans:
+                if ts.endTime > highestEndtime: highestEndtime = ts.endTime
+                 
+            generalRestDuration = nextVert.offset - highestEndtime
+            generalRestOffset = highestEndtime
+             
+             
+        
+            return PitchCollection(None, [], generalRestDuration, generalRestOffset)
+             
+         
+        else:
+            return None
+         
+        ''' if next vert has no stop and no overlaps, the event between current verticality and next one is a general silence '''
+          
+         
+    
 #     def getChordifiedStream (self, unused_filter=['CN', 'SU']):
 #     
 #         ''' build root stream and chordify it '''
@@ -872,6 +779,31 @@ class PitchCollectionSequence (object):
 #         
 #         return chordifiedStream            
     
+    def correctSymbolicMeasureNumbers(self):
+        ''' this reassigns  symbolic measure numbers: starting with 1 an numbering everything '''
+        
+        for part in  self.work.recurse().getElementsByClass(stream.Part):
+            measureCounter = 1
+            for measure in part.recurse().getElementsByClass(stream.Measure):
+                measure.number = measureCounter
+                measureCounter = measureCounter+1
+                
+                
+        
+    
+    def getMeasureOffsets(self):
+        measureOffsetList = []
+        
+        for measure in  self.work.recurse().getElementsByClass(stream.Measure):
+            
+            if measure.offset not in measureOffsetList:
+                measureOffsetList.append(measure.offset)
+        
+        return measureOffsetList
+            
+            
+        
+    
     def getPitchCollectionSubset (self, startOffset, endOffset):
         subList = []
         
@@ -889,7 +821,7 @@ class PitchCollectionSequence (object):
         ''' get pitch coll index of offset'''
         v0Index = None
         for  explainedPitchCollectionCounter in range (0, len(self.explainedPitchCollectionList)):
-            if self.explainedPitchCollectionList[explainedPitchCollectionCounter].verticality.offset == offset:
+            if self.explainedPitchCollectionList[explainedPitchCollectionCounter].offset == offset:
                 v0Index = explainedPitchCollectionCounter
                 break
         
@@ -904,6 +836,60 @@ class PitchCollectionSequence (object):
                 contextList.append(self.explainedPitchCollectionList[index])
                 
         return contextList
+    
+    
+    def getRelativeOffset (self, verticality):
+        
+        ''' given a verticality, this function returns its relative offset, i.e its offset within a measure'''
+        referenceMeasureOffset = None
+        
+        for count, value in enumerate(self.measureOffsetList):
+            if len(self.measureOffsetList) > count +1 : 
+                if verticality.offset >= value and verticality.offset < self.measureOffsetList[count+1]:
+                    referenceMeasureOffset = value
+                    break
+            else:
+                
+                if verticality.offset >= value:
+                    referenceMeasureOffset = value
+                    break
+                
+        if referenceMeasureOffset != None:
+            return verticality.offset - referenceMeasureOffset
+                    
+                
+                    
+                
+        
+        
+        
+        
+        
+    
+    def getSectionEndTimes (self, sectionEndMarkers = ["final", "double", "fermata"]):
+        '''this always takes into account the element's endTime: i.e. offset + duration in quarter length'''
+         
+        offsetList = [] 
+        if hasattr(self, "stream")== False: return []
+          
+        if "final" in sectionEndMarkers or "double" in sectionEndMarkers or "repeat" in sectionEndMarkers:
+            for measure in self.stream.semiFlat.getElementsByClass(stream.Measure):
+                if measure.rightBarline == None : continue
+                if measure.rightBarline.type in  ["final", "double"]: 
+                    highestTime = measure.duration.quarterLength + measure.offset
+                    if highestTime not in offsetList: 
+                        offsetList.append(highestTime)
+             
+        if "fermata" in sectionEndMarkers:
+            for noteElement in self.stream.flat.recurse().getElementsByClass (note.Note):
+                for elementExpression in noteElement.expressions:
+                    if elementExpression.name == "fermata":
+                        endTime = noteElement.offset + noteElement.duration.quarterLength
+             
+                        if endTime not in offsetList: 
+                            offsetList.append(endTime) 
+              
+        return offsetList 
         
     def getUnexplainedPitches (self, startOffset=None, stopOffset=None):
         pitchList = []
@@ -920,14 +906,17 @@ class PitchCollectionSequence (object):
         
         return pitchList   
     
-    def getPitchObservations(self):
+    def setPitchObservations(self, dataPath, labelDictionary):
+        
+        ###  dic for dissonances   thisdict = {"CN": 0, "PN": 1, "NN": 2, "AN": 3, "SU": 4, "AP": 5, "PE": 6, "EN":7}
+        
         import numpy as np
         import os
         
         ''' get highest fileIndex in folder '''
  
         filenameList = []
-        for filename in os.listdir('/Users/Christophe/Desktop/dataset/observations/'):
+        for filename in os.listdir(dataPath + "observations/"):
             if filename[-3:] != 'npy':continue
             filenameList.append(filename)
 
@@ -939,12 +928,12 @@ class PitchCollectionSequence (object):
             for analyzedPitch in pitchCollection.analyzedPitchList:
                 
                 ''' get observation list '''
-                observationList = self.getObservationsForPitchId(analyzedPitch.id, 5, pitchCollection.verticality.offset)
+                observationList = self.getObservationsForPitchIdChromatic(analyzedPitch.id, 5, pitchCollection.verticality.offset)
                 # fileObservations.write(observationString)
         
                 ''' store label in file_2'''
                 labelString = analyzedPitch.pitchType  # + '\t' + analyzedPitch.pitchSubType
-                if labelString not in ["CN", "PN", "NN", "AN", "SU", "AP", "PE", "EN"]:
+                if labelString not in labelDictionary:
                     print ("Wrong label...skip: " + str(labelString))
                     continue
                 
@@ -954,15 +943,14 @@ class PitchCollectionSequence (object):
                 if analyzedPitch.id == None or pitchCollection.verticality.offset == None:
                     print ("ID or Offset not identified... skip")
                     continue 
-                idString = analyzedPitch.id + '; ' + str(pitchCollection.verticality.offset)
+                idString = str(analyzedPitch.id) + '; ' + str(pitchCollection.verticality.offset)
                 # fileId.write(idString)
                 
-                ''' put everything in numpy array'''
-                thisdict = {"CN": 0, "PN": 1, "NN": 2, "AN": 3, "SU": 4, "AP": 5, "PE": 6, "EN":7}
+                
             
-                np.save('/Users/Christophe/Desktop/dataset/observations/' + str(fileIndex).zfill(7), np.array(observationList), True, False)
-                np.save('/Users/Christophe/Desktop/dataset/labels/' + str(fileIndex).zfill(7), np.array(thisdict[labelString]), True, False)
-                np.save('/Users/Christophe/Desktop/dataset/ids/' + str(fileIndex).zfill(7), np.array(idString), True, False)
+                np.save(dataPath + '/observations/' + str(fileIndex).zfill(7), np.array(observationList), True, False)
+                np.save( dataPath + '/labels/' + str(fileIndex).zfill(7), np.array(labelDictionary[labelString]), True, False)
+                np.save(dataPath + '/ids/' + str(fileIndex).zfill(7), np.array(idString), True, False)
                 
                 print ("Observation %s set" % (fileIndex))
                 
@@ -1154,9 +1142,10 @@ class PitchCollectionSequence (object):
         for index in range (0, len(pitchCollectionList)):
             pitchCollection = pitchCollectionList[index]
             
-            if pitchCollection == None: continue  # in that case all values remain zero 
-            print(pitchCollection.offset)
-            deepestPitchClass = pitchCollection.getBassPitch().step  # get deepest pitch class
+            if pitchCollection == None:  continue  # in that case all values remain zero 
+            if pitchCollection.verticality == None: continue # in that case all values remain zero 
+            
+            deepestPitchClass = pitchCollection.getBassPitch().name  # get deepest pitch class
             
             ''' loop over every analyzed pitch '''
             for analyzedPitch in pitchCollection.analyzedPitchList:
@@ -1202,6 +1191,95 @@ class PitchCollectionSequence (object):
         
         return contextList 
     
+    def getObservationsForPitchIdChromatic(self, analyzedPitchId, context=5, offset=0):
+        
+        ''' build list of list and fill everything with 0'''
+        pitchList = []
+        contextList = []
+        
+      
+            
+            
+            
+        note2NumDic =  {"C-":0, "C":1, "C#":2, "C##":2, "D-":3, "D":4, "D#":5, "E--":6,  "E-":6, "E":7, "E#":8, "F-":9, "F":10, "F#":11, "F##":11, "G-":12, "G":13, "G#":14, "A-":15, "A":16, "A#":17, "B--": 18,  "B-":18, "B":19, "B#":20}
+        
+        
+        observationList = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] # 18 criteria
+        
+        for unused_counter in range (0, 21):
+            pitchList.append(deepcopy(observationList))     
+        
+        for unused_counter in range (0, context * 2 + 1):
+            contextList.append(deepcopy(pitchList))     
+        
+        
+        ''' get transposition interval '''
+        observedPitch = self.getAnalyzedPitchCorrespondingToId(analyzedPitchId, offset)
+        transpositionInterval = interval.Interval(noteStart=observedPitch[0].pitch, noteEnd=pitch.Pitch('C4'))  # # reference is arbitrarily set to 'C4' could be any pitch 
+        
+         
+        # print ('Reference pitch: ' + observedPitch[0].pitch.step + ", diatonic number: " + str(pitchDiatonicNumber) + ", diatonic vector: " + str (diatonicVector))
+        
+        ''' create pitchCollList i.e. context before and after reference offset'''
+        pitchCollectionList = self.getPitchCollectionContext(offset, context)
+        
+        ''' loop over pitch colls '''
+        for index in range (0, len(pitchCollectionList)):
+            pitchCollection = pitchCollectionList[index]
+            
+            if pitchCollection == None: continue  # in that case all values remain zero
+            deepestPitchClass = pitchCollection.getBassPitch().name  # get deepest pitch class
+            
+            ''' loop over every analyzed pitch '''
+            for analyzedPitch in pitchCollection.analyzedPitchList:
+                
+                ''' transpose pitch '''
+                transpositionInterval.noteStart = note.Note(analyzedPitch.pitch.nameWithOctave)
+                transposedPitch = transpositionInterval.noteEnd.pitch
+                
+                
+                chromaticStep =note2NumDic[transposedPitch.name]
+                
+               
+                
+                # print ("Observed pitch (0): %s, transposition interval: %s, current pitch: %s, transposition: %s, diatonic step: %s, alteration: %s " %(observedPitch[0].pitch, transpositionInterval, analyzedPitch.pitch.nameWithOctave, transposedPitch.nameWithOctave, diatonicStep, transposedPitch.alter))
+                
+                ''' fill list with dimension at corresponding position '''
+                    
+                ''' 1.  chromatic steps '''
+                contextList[index][chromaticStep][0] = 1 
+                
+                ''' 2. deepest pitch  '''   
+                contextList[index][chromaticStep][1] = 1 if deepestPitchClass == analyzedPitch.pitch.name else 0
+                
+          
+                
+                ''' 3. duration '''
+                contextList[index][chromaticStep][2] = pitchCollection.duration
+                
+                ''' 4. beat strength '''
+                contextList[index][chromaticStep][3] = pitchCollection.beatStrength 
+                
+                ''' 5. attack '''
+                contextList[index][chromaticStep][4] = 1 if analyzedPitch.attack == True else 0
+                
+                ''' 6. occurrence '''
+                contextList[index][chromaticStep][5] = contextList[index][chromaticStep][6] + 1 
+                
+                ''' 7. same voice - part as reference pitch ''' 
+                if contextList[index][chromaticStep][6] == 0:  # the diatonic step may be instantiated by another pitch. If result is positive, leave it like this
+                    if analyzedPitch.part == observedPitch[0].part and analyzedPitch.voice == observedPitch[0].voice:
+                        contextList[index][chromaticStep][6] = 1 
+                    else: 0 
+                    
+                '''8-18 octave location (octaves 0 to 10) '''
+                contextList[index][chromaticStep][7 + analyzedPitch.pitch.octave] = contextList[index][chromaticStep][7 + analyzedPitch.pitch.octave] + 1
+                
+            
+            
+        return contextList         
+    
+    
     def getObservationsForPitchId(self, analyzedPitchId, context=5, offset=0):
         
         ''' build list of list and fill everything with 0'''
@@ -1230,7 +1308,7 @@ class PitchCollectionSequence (object):
             pitchCollection = pitchCollectionList[index]
             
             if pitchCollection == None: continue  # in that case all values remain zero
-            deepestPitchClass = pitchCollection.getBassPitch().step  # get deepest pitch class
+            deepestPitchClass = pitchCollection.bass.step  # get deepest pitch class
             
             ''' loop over every analyzed pitch '''
             for analyzedPitch in pitchCollection.analyzedPitchList:
@@ -1259,7 +1337,7 @@ class PitchCollectionSequence (object):
                 contextList[index][diatonicStep][3] = pitchCollection.duration
                 
                 ''' 5. beat strength '''
-                contextList[index][diatonicStep][4] = pitchCollection.verticality.beatStrength 
+                contextList[index][diatonicStep][4] = pitchCollection.beatStrength 
                 
                 ''' 6. attack '''
                 contextList[index][diatonicStep][5] = 1 if analyzedPitch.attack == True else 0
@@ -1297,6 +1375,34 @@ class PitchCollectionSequence (object):
             
         return xmlSequence    
     
+    
+    def setAnnotationsToStream_Expressions(self):
+        
+        ''' this is used to add analytical information stored in pitch colls to the stream '''
+        
+        ''' loop over analyzed pitches '''
+        
+        for analysedPitch in self.getAnalyzedPitches():
+            if analysedPitch.pitchType != None:
+            
+                te = expressions.TextExpression(str(analysedPitch.pitchType))
+                
+                for measure in analysedPitch.part.getElementsByClass(stream.Measure):
+                    if analysedPitch.offset >= measure.offset and analysedPitch.offset <= measure.offset + measure.highestOffset:
+                        measure.insert(analysedPitch.offset-measure.offset, te)
+                        break
+        
+            
+          
+        
+        ''' select part '''
+            
+        
+        
+        
+        
+    
+    
     def setRootsFromStream(self, stream):
         
         flatRootSream = stream.flat
@@ -1309,6 +1415,43 @@ class PitchCollectionSequence (object):
             rootNote = flatRootSream.getElementAtOrBefore(pitchColl.offset, note.Note)
             if rootNote ==None: continue
             pitchColl.rootPitch = rootNote.pitch
+     
+    def setRootsFromPart (self, partName): 
+        
+        for pitchColl in self.explainedPitchCollectionList:    
+            if pitchColl.verticality == None: 
+                continue
+            
+            for analyzedPitch in pitchColl.analyzedPitchList:
+                
+                if analyzedPitch.part.partName == partName:
+                    pitchColl.rootPitch = analyzedPitch.pitch
+                    continue
+                
+        
+        
+            
+    def setSectionStartAndEndTimes (self, pitchCollList):
+        ''' identify structural elements i.e.  fermata, a double bar, a final bar etc. endtimes  '''
+        self.endTimeList = self.getSectionEndTimes()
+        collLength = len (pitchCollList)
+         
+        for counter, pitchColl in enumerate(pitchCollList):
+            if counter == 0: 
+                pitchColl.isSectionStart = True
+            
+            
+            if pitchColl.endTime in self.endTimeList:
+                pitchColl.isSectionEnd = True
+                
+                if counter + 1 < collLength:
+                    pitchCollList[counter +1].isSectionStart = True
+                
+            
+                
+                 
+        return pitchCollList
+    
                 
             
             
@@ -1754,13 +1897,14 @@ class PitchCollection():
     ''' class stores and manages information about all pitches collected in a verticality ''' 
     ''' also used to store information of general rest - in that case params offset and duration are requested '''
     
-    def __init__(self, verticality, analyzedPitchList, duration = None, offset = None):
+    def __init__(self, verticality=None, analyzedPitchList=[], duration = None, offset = None):
         self.id = id(self)
-        self.analyzedPitchList = analyzedPitchList
+        self.analyzedPitchList = analyzedPitchList # really necessary ? deepcopy(analyzedPitchList)
         self.verticality = verticality
         self.chord = None
         self.rootPitch = None 
         self.isSectionEnd = False
+        self.isSectionStart = False
         self.bass = None 
         self.bassScaleDegree = None
         self.bassDiatonicDegree = None
@@ -1768,6 +1912,7 @@ class PitchCollection():
         self.intervalsToBass = []
         self.continuoSigns = [] # very simplified for now
         self.simpleContinuoSigns = []
+    
         #self.romanNumeral = None
         
         if verticality != None:
@@ -1776,6 +1921,15 @@ class PitchCollection():
             self.chord = verticality.toChord() 
             self.offset = verticality.offset 
             self.bass = self.chord.bass()
+            self.beatStrength = verticality.beatStrength
+            self.measureNumber = verticality.measureNumber
+             
+             
+             
+            
+            
+            
+             
             
             bassNote = note.Note (self.bass.name)
             bassNote.octave = 0
@@ -1796,7 +1950,8 @@ class PitchCollection():
             self.duration = duration
             self.offset = offset
             
-        self.endTime = self.offset + self.duration
+        if self.offset != None and self.duration != None:
+            self.endTime = self.offset + self.duration
             
             
         
@@ -1923,6 +2078,8 @@ class PitchCollection():
         return subset
     
     def getBassPitch (self):
+        if self.verticality == None:
+            return None
         return self.verticality.toChord().bass()
     
     def getExplainedPitches (self, pitchTypeList=['CN']):
@@ -2090,14 +2247,14 @@ class Pitch():
     ''' class stores and manages information about individual pitches'''
     ''' these pitches are grouped in a verticality (class AnalyzedPitchCollection)'''
     
-    def __init__(self, pitch, verticalities, hypothesisList=[]):
+    def __init__(self, pitch=None, verticalities=None, hypothesisList=None):
         #self.horizontalities = None
         #self.elementsStartingList = []
         self.accentuated = None
-        #self.pitchType = None
+        self.pitchType = None
         #self.pitchSubType = None
         #self.verticalities = verticalities
-        self.offset = verticalities[1].offset
+        self.offset = verticalities[1].offset if verticalities != None else None
         self.pitch = pitch
         #self.harmonicNote = False
         #self.probability = -1
@@ -2114,6 +2271,7 @@ class Pitch():
         #self.hypothesesChecked = False
         #if len (hypothesisList) > 0:  self.setBestHypothesis()
         self.id = None
+        self.XMLId = None
         self.part = None
         self.voice = None
         self.work = None

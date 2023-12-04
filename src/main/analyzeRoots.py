@@ -26,8 +26,8 @@ rootDirectoryName = directoryName(directoryName(directoryName(__file__)))
 #workDirectoryString = '/Users/christophe/Dropbox/WTBach/'
 #outputDirectoryString = '/Users/christophe/Dropbox/HarmonisationsBach/analyseModèle/'
 
-workDirectoryString = '/Users/christophe/Documents/Praetorius/Musae Sioniae/xml/'
-outputDirectoryString = '/Users/christophe/Documents/Praetorius/Musae Sioniae/roots/'
+workDirectoryString = '/Users/christophe/Documents/Chostakovitch/'
+outputDirectoryString = '/Users/christophe/Documents/Chostakovitch/roots/'
 
 modelPath = '/Users/christophe/Documents/GitHub/PolyMIR/models/rootModel16072020.h5'
 rootModel = keras.models.load_model(modelPath)
@@ -54,13 +54,13 @@ for file in os.listdir(workDirectoryString):
     
     
     ''' create PirtchCollectionSequencesObject '''
-    pitchCollectionSequences = pitchCollections.PitchCollectionSequences(work) 
+    pitchCollectionSequence = pitchCollections.PitchCollectionSequence(work) 
     
     
     ''' add root information '''
-    rootAnal = rootAnalysis.RootAnalysis(pitchCollectionSequences)
-    rootAnal.analyzeWithModel(rootModel)
-    rootAnal.modelScores()
+    rootAnal = rootAnalysis.RootAnalysis(pitchCollectionSequence)
+    #rootAnal.analyzeWithModel(rootModel)
+    #rootAnal.modelScores()
     
     
     ''' add stream with roots to score '''

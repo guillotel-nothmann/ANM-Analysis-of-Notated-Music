@@ -37,7 +37,7 @@ def unabbreviateNode (tripleNode):
     if isinstance(tripleNode, int): 
         element1 = onto._unabbreviate(tripleNode)
     else: 
-        element1 = triple
+        element1 = tripleNode
     
     return element1
         
@@ -322,6 +322,7 @@ addOntologyDataProperty("isSectionEnd", [str])
 addOntologyDataProperty("hasRealBass", [str])
 addOntologyDataProperty("hasContinuoSigns", [str])
 addOntologyDataProperty("hasEndTime", [float])
+addOntologyDataProperty("hasBeatStrength", [float])
 
 ''' cadence analysis'''
 addOntologyDataProperty("hasFinalScaleDegree", [str])
@@ -476,10 +477,6 @@ for file in dirList:
     workClassInstance.hasTitle = [str(work.metadata.title)] 
     workClassInstance.hasMeasureNumber = [int(work.finalBarline[0].measureNumber)]
     
-    
-    
-       
-    
     ''' part analysis '''
     partAnalInstList = createPartAnalysisInstance(work)  
     partCollectionInstance = partAnalInstList[1]
@@ -498,7 +495,7 @@ for file in dirList:
     ''' pitch Analysis '''
     analysedPitches = scaleAnal.workAnalyzedPitches  
     pitchAnal = PitchAnalysis(analysedPitches, hierarchyList=["pitch.name"]) 
-    pitchCollSequenceInstance = createAnalyzedPitchCollectionSequence(scaleAnal.pitchCollectionSequences.pitchCollSequence) 
+    pitchCollSequenceInstance = createAnalyzedPitchCollectionSequence(scaleAnal.pitchCollectionSequence) 
     pitchAnalysisInstanceWork = createPitchAnalysisInstance(pitchAnal)
     pitchAnalysisInstanceWork.hasStrongestPitches.append(str(pitchAnal.getHighestScores(True)))
     pitchAnalysisInstanceWork.hasAnalyzedPitchCollectionSequence.append(pitchCollSequenceInstance) 
@@ -521,7 +518,7 @@ for file in dirList:
     ''' root and progression analysis ''' 
     #scaleAnal.pitchCollectionSequences.setRootsFromStream(rootStream)  
     
-    rootAnal = rootAnalysis.RootAnalysis(scaleAnal.pitchCollectionSequences)
+    rootAnal = rootAnalysis.RootAnalysis(scaleAnal.pitchCollectionSequence)
     referencePitch = rootAnal.pitchCollectionSequence.explainedPitchCollectionList[-1].rootPitch.name # careful, careful !!!
     rootAnal.populateRootDictionary() 
     rootAnal.setRootDegreeFromReferencePitch(bestScale[0], referencePitch) # this may lead to inconsistencies between cadence analysis and root analysis
@@ -542,7 +539,7 @@ for file in dirList:
    
     
     ''' vector analysis '''
-    vectorAnal = VectorAnalysis(scaleAnal.pitchCollectionSequences)
+    vectorAnal = VectorAnalysis(scaleAnal.pitchCollectionSequence)
     vectorAnalysisInstance = createVectorAnalysisInstance(vectorAnal)
     rootAndProgressionAnalysisInstance.hasVectorAnalysis.append(vectorAnalysisInstance)
 
@@ -621,12 +618,12 @@ for file in dirList:
            
     
     ''' update pitch collection sequence '''
-    updateAnalyzedPitchCollectionSequence(scaleAnal.pitchCollectionSequences.pitchCollSequence)
+    updateAnalyzedPitchCollectionSequence(scaleAnal.pitchCollectionSequence)
     
     
     
-    for triple in onto.get_triples(scaleAnalysisInstance.storid, None, None):
-        print (unabbreviateTriple(triple))
+    #for triple in onto.get_triples(scaleAnalysisInstance.storid, None, None):
+    #    print (unabbreviateTriple(triple))
 
     
     

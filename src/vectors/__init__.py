@@ -25,15 +25,12 @@ import copy, logging
 
 class VectorAnalysis(object):    
     
-    def __init__(self, pitchCollSequenceList):
+    def __init__(self, pitchCollSequence):
         
-        self.pitchCollectionSequenceList = []
+         
         self.chordSequenceList = []
         self.pitchCollSubList = [] ### the pitch coll sequences is slided according to end sections 
-       
-        
-        if type(pitchCollSequenceList) is not list: pitchCollSequenceList = [pitchCollSequenceList]
-        self.pitchCollectionSequenceList = pitchCollSequenceList
+        self.pitchCollSequence = pitchCollSequence
         
         
         
@@ -62,7 +59,7 @@ class VectorAnalysis(object):
        
         self.pitchCollSubList.append([])
         
-        for counter,  pitchColl in enumerate(self.pitchCollectionSequenceList[0].pitchCollSequence.explainedPitchCollectionList): 
+        for counter,  pitchColl in enumerate(self.pitchCollSequence.explainedPitchCollectionList): 
             
             ''' cut if general rest '''
             if pitchColl.rootPitch == None:  
@@ -72,7 +69,7 @@ class VectorAnalysis(object):
             self.pitchCollSubList[-1].append(pitchColl)
             
             ''' cut if sequence end '''
-            if pitchColl.isSectionEnd == True and len (self.pitchCollectionSequenceList[0].pitchCollSequence.explainedPitchCollectionList) != counter +1:
+            if pitchColl.isSectionEnd == True and len (self.pitchCollSequence.explainedPitchCollectionList) != counter +1:
                 self.pitchCollSubList.append([])  
     
     

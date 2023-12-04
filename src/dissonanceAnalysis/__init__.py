@@ -4,19 +4,25 @@ import tensorflow as tf
 from tensorflow import keras
 
 
+### requires tensforflow 1.6 (unsure => check)
+### keras==2.1.3  (unsure => check)
+
 class DissonanceAnalysis ():
 
-    def __init__(self, pitchCollectionSequences):
-        self.pitchCollectionSequenceList = pitchCollectionSequences
+    def __init__(self, pitchCollSequence):
+        
+        
+        self.algorithmId = "dissonanceAnalysis03042021"
+        self.pitchCollSequence = pitchCollSequence
         #self.featuresPath = 'dissonanceNeuralNetwork/observations.npy' 
         #self.labelsPath = 'dissonanceNeuralNetwork/labels.npy'
-        self.modelPath = 'models/dissonanceModel.h5'
+        self.modelPath = '/Users/christophe/Documents/GitHub/PolyMIR/models/dissonanceModel.h5'
         
         ''' run model '''
         #self.features = np.load(self.featuresPath)
         #self.labels = np.load(self.labelsPath)
         self.new_model = keras.models.load_model(self.modelPath)
-        self.new_model.compile(optimizer=tf.train.AdamOptimizer(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        self.new_model.compile(optimizer="adam",  loss='sparse_categorical_crossentropy',metrics=['accuracy'])
         self.new_model.summary()
         
         #unused_loss, acc = self.new_model.evaluate(self.features, self.labels)
@@ -24,18 +30,21 @@ class DissonanceAnalysis ():
     
         self.analyzeWithModel()
         
+    
+    
+    
     def analyzeWithModel (self):
         
         ''' loop over all analyzed pitches '''
-        pitchCollectionSequence = self.pitchCollectionSequenceList.pitchCollSequence
+  
         
-        for pitchCollection in pitchCollectionSequence.explainedPitchCollectionList:
+        for pitchCollection in self.pitchCollSequence.explainedPitchCollectionList:
             ''' loop over all analyzed pitches '''
             for analyzedPitch in pitchCollection.analyzedPitchList:
                 
                 ''' get observation list and put it in array '''                
                 
-                observationArray = np.array(pitchCollectionSequence.getObservationsForPitchId(analyzedPitch.id, 5, pitchCollection.verticality.offset))
+                observationArray = np.array(self.pitchCollSequence.getObservationsForPitchId(analyzedPitch.id, 5, pitchCollection.offset))
                 feature = np.array([observationArray])
                             
                 ''' make prediction from observation list '''

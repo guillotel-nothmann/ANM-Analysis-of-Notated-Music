@@ -25,7 +25,8 @@ def getTranspositionIntervals (sharps=0, maxSharps=0):
         return keyTranspositionsDictionary[sharps]    
         
     else : return ['p1']
-        
+    
+
     
     
     
@@ -103,9 +104,9 @@ for file in os.listdir(rootDirectoryString):
         transposedRootStream = rootStream.transpose(transposition)
      
         ''' create PirtchCollectionSequencesObject '''
-        pitchCollectionSequences = pitchCollections.PitchCollectionSequences(transposedWork) 
+        pitchCollectionSequences = pitchCollections.PitchCollectionSequence(transposedWork) 
         
-        
+
         ''' add root information '''
         rootAnal = rootAnalysis.RootAnalysis(pitchCollectionSequences)
         rootAnal.addRootInformation(transposedRootStream)

@@ -28,9 +28,9 @@ def getListFromDictionary(dataDictionary, dictionaryKey):
 if __name__ == '__main__':
     pass
 
-workWithRootDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/xmlWithRoot/testWithRoot/'
-workDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/test/'
-workBookPath = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/rootsAndVectors.xlsx'
+workWithRootDirectoryString = '/Users/christophe/Documents/Chostakovitch/noRoots/'
+workDirectoryString = '/Users/christophe/Documents/Chostakovitch/roots/'
+workBookPath = '/Users/christophe/Documents/Chostakovitch/rootsAndVectors_2.xlsx'
 
 
 corrputedFilesList = []
@@ -77,11 +77,11 @@ for file in os.listdir(workWithRootDirectoryString):
         
     
     ''' create PitchCollectionSequencesObject and add root information '''
-    pitchCollectionSequences = pitchCollections.PitchCollectionSequences(workWithoutRoot)
+    pitchCollectionSequences = pitchCollections.PitchCollectionSequence(workWithoutRoot)
     pitchCollectionSequences.setRootsFromStream(rootStream) 
     
     ''' analyze roots and inversions '''
-    rootAnal = rootAnalysis.RootAnalysis(pitchCollectionSequences)
+    rootAnal = rootAnalysis.RootAnalysis(pitchCollectionSequences, analyzeWithModel=False)
     rootAnal.populateRootDictionary() 
      
     

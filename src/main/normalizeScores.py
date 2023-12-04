@@ -15,15 +15,15 @@ rootDirectoryName = directoryName(directoryName(directoryName(__file__)))
 #workDirectoryString = '/Users/christophe/Dropbox/WTBach/'
 #outputDirectoryString = '/Users/christophe/Dropbox/HarmonisationsBach/analyseModèle/'
 
-workDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/tests/'
-outputDirectoryString = '/Users/christophe/Dropbox/Praetorius/Polyhymnia/Source/normalized/'
+workDirectoryString = '/Users/christophe/Dropbox/exemplesZarlino/Analyses/musicXML/'
+outputDirectoryString = '/Users/christophe/Dropbox/exemplesZarlino/Analyses/musicXML/normalizeds'
 
  
  
 
 for file in os.listdir(workDirectoryString):
     fileName = os.fsdecode(file)
-    if fileName.endswith(".musicxml")== False: continue
+    if fileName.endswith(".mxl")== False: continue
      
     print ("Analyzing file " + fileName)
 
@@ -35,7 +35,7 @@ for file in os.listdir(workDirectoryString):
     work = scoreNorm.normalizePartNames()
     
     work = scoreNorm.addTimeSignaturesWhereNeeded()
-    #work = scoreNorm.resetMeasureOffsets()
+    work = scoreNorm.resetMeasureOffsets()
     
     
     

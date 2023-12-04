@@ -1,12 +1,28 @@
 ''' imports ''' 
 from music21.stream import Score
+from music21.note import Note
+
+class PitchAnalysisSimple ():
+    def __init__(self, work):
+        ''' this is a very basic class to extract pitch classes '''
+        self.work = work
+        self.pitchClassList = []
+        
+        
+        for note in work.recurse().getElementsByClass(Note):
+            if note.name not in self.pitchClassList:
+                self.pitchClassList.append(note.name)
+        
+        
+         
+    
+
 
 class PitchAnalysis ():
     
     def __init__(self, analyzedPitches, hierarchyList= ["pitch.step", "pitch.octave", "pitch.alter"],filterList=[]): 
         
-        ''' possible hierarchy criteria: all attributes of an analysed pitch: p. ex. 
-         
+        ''' possible hierarchy criteria: all attributes of an analysed pitch:  
          --- .part (part information)
          --- pitch.step (the pitch class WITHOUT alteration: A, B, etc.)
          --- pitch.name (the pitch class with alteration: B-)
@@ -119,7 +135,7 @@ class PitchAnalysis ():
             
         scoreList.sort(key=lambda x: x[1], reverse = True)    
             
-        return scoreList[0:2]
+        return scoreList#s[0:2]
             
             
     

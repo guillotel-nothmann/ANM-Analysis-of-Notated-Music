@@ -12,9 +12,9 @@ from music21.interval import Interval
 
 class RootAnalysis ():
 
-    def __init__(self, pitchCollectionSequences, analyzeWithModel = True):
-        self.pitchCollectionSequences = pitchCollectionSequences
-        self.pitchCollectionSequence =  pitchCollectionSequences.pitchCollSequence
+    def __init__(self, pitchCollectionSequence, analyzeWithModel = True):
+       
+        self.pitchCollectionSequence =  pitchCollectionSequence
         self.scoreTree = self.pitchCollectionSequence.scoreTree
         self.overallScore = None
         self.lowestScore = None
@@ -175,8 +175,8 @@ class RootAnalysis ():
         #self.labelsPath = 'dissonanceNeuralNetwork/labels.npy'
          
         
-        ### requires tensforflow 1.6
-        ### keras==2.1.3 
+        ### requires tensforflow 1.6 seems to be wrong
+        ### keras==2.1.3  seems to be wrong
 
         labelDict = {0:"C-", 1:"C", 2:"C#", 3:"D-", 4:"D", 5:"D#", 6:"E-", 7:"E", 8:"E#", 9:"F-", 10:"F", 11:"F#", 12:"G-", 13:"G", 14:"G#", 15:"A-", 16:"A", 17:"A#", 18:"B-", 19:"B", 20:"B#"}
             
@@ -202,7 +202,9 @@ class RootAnalysis ():
             
             ''' check if collection is not empty '''
                 
-            ''' get observation list and put it in array '''                
+            ''' get observation list and put it in array '''  
+            if pitchCollection.verticality == None: 
+                continue              
             
             observationArray = np.array(self.pitchCollectionSequence.getObservationsForVerticality(pitchCollection.verticality, 5))
             feature = np.array([observationArray])
@@ -354,6 +356,12 @@ class RootAnalysis ():
         
 
         for pitchColl in self.pitchCollectionSequence.explainedPitchCollectionList:
+            print (pitchColl.offset)
+            
+            
+            if pitchColl.duration == 1/672 :
+                pitchColl.duration = 0.64
+                print ("Duration problem")
             if pitchColl.rootPitch != None:
                 rootPitch = pitchColl.rootPitch
                 rootPitch.octave = 3
@@ -380,12 +388,12 @@ class RootAnalysis ():
             measureCounter = 0
             for measureCounter in range (0, len (measureList)):
                 
-                if pitchColl.verticality.offset >= measureList[measureCounter].offset:
+                if pitchColl.offset >= measureList[measureCounter].offset:
                     if len (measureList) - 1 == measureCounter: # last measure
-                        measureList[measureCounter].insert(pitchColl.verticality.offset-measureList[measureCounter].offset, rootNote) 
+                        measureList[measureCounter].insert(pitchColl.offset-measureList[measureCounter].offset, rootNote) 
                         break
                     else:
-                        if pitchColl.verticality.offset <  measureList[measureCounter+ 1].offset : 
+                        if pitchColl.offset <  measureList[measureCounter+ 1].offset : 
                             
                             ''' check if element exists in stream '''
                             elementExists = False
@@ -397,7 +405,7 @@ class RootAnalysis ():
                             
                             if elementExists == False: 
                                 #rootNote.editorial = self.name
-                                measureList[measureCounter].insert(pitchColl.verticality.offset-measureList[measureCounter].offset, rootNote) 
+                                measureList[measureCounter].insert(pitchColl.offset-measureList[measureCounter].offset, rootNote) 
                             break   
  
          
@@ -447,6 +455,6 @@ class RootAnalysis ():
     def setObservationData(self, observationsDirectory):
         
          
-        pitchCollectionSequence = self.pitchCollectionSequences.pitchCollSequence
+        pitchCollectionSequence = self.pitchCollectionSequence.pitchCollSequence
         
         pitchCollectionSequence.setVerticalityObservations(observationsDirectory)

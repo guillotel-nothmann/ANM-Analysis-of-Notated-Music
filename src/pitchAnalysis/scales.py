@@ -3,17 +3,26 @@ Created on Dec 10, 2019
 
 @author: christophe
 '''
-from music21 import scale
+from music21 import scale, stream
 import pitchCollections
+from builtins import isinstance
 
 class ScaleAnalysis(object):
 
-    def __init__(self, work):
-        
+    def __init__(self, workOrPitchCollectionSequence):
+        self.pitchCollectionSequence = None
         ''' create analysis object and get analyzed pitch list'''
-        analysisObject = pitchCollections.PitchCollectionSequences(work, False, False) #   adaptable frame,  hypotheses explored 
-        self.pitchCollectionSequences = analysisObject
-        self.workAnalyzedPitches = analysisObject.getAnalyzedPitches()
+        
+        if isinstance(workOrPitchCollectionSequence, stream.Stream): 
+            self.pitchCollectionSequence = pitchCollections.PitchCollectionSequence(workOrPitchCollectionSequence)
+        
+        elif isinstance(workOrPitchCollectionSequence, pitchCollections.PitchCollectionSequence):
+            self.pitchCollectionSequence = workOrPitchCollectionSequence
+            
+        
+        if self.self.pitchCollectionSequence == None: return
+        
+        self.workAnalyzedPitches = self.pitchCollectionSequence.getAnalyzedPitches()
         
         
         

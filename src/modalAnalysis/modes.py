@@ -99,11 +99,6 @@ class ModalAnalysis(object):
         if ambitusInterval.semitones <=9: contractedAmbitus = True
         
         
-         
-        
-        
-        
-        
         lowerNoteIsAuthentic = False
         lowerNoteIsPlagal = False
         
